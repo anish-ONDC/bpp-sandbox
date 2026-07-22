@@ -73,20 +73,4 @@ Each POST above triggers an async `on_<action>` callback to `BPP_CALLBACK_ENDPOI
 
 ## Sample requests
 
-Example request bodies for each action are in `sample_payloads/` (one level up from this repo) — useful as a starting point for Postman or curl testing.
-
-# Docker image builds
-
-## Local build
-
-```bash
-docker buildx build --platform linux/amd64,linux/arm64 -t sandbox-2.0:local --load .
-```
-
-## Push to Docker Hub
-
-This needs authorization to push to Docker Hub. You can use `docker login` to login to Docker Hub.
-
-```bash
-docker buildx build --platform linux/amd64,linux/arm64 -t fidedocker/sandbox-2.0:latest --push .
-```
+Example request bodies for each action are in [`sample_payloads/`](sample_payloads/) — useful as a starting point for Postman or curl testing.
