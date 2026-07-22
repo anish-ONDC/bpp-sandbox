@@ -15,15 +15,22 @@ export const normalizeDomain = (domain: string) => {
  * Resolves the domain identifier from a beckn context object.
  * Falls back to networkId if domain is absent.
  */
-export const resolveDomain = (context: any): string => {
+export const resolveDomain = (context: any): string | undefined => {
+  if (!context) {
+    return undefined;
+  }
   return context.domain || context.network_id || context.networkId;
 };
 
 export const readDomainResponse = async (
-  domain: string,
+  domain: string | undefined,
   action: string,
   persona?: string
 ) => {
+  if (!domain) {
+    console.warn(`readDomainResponse called with no domain (action: ${action}), returning empty object`);
+    return {};
+  }
   const normalizedDomain = normalizeDomain(domain);
 
   // If persona is specified, try persona-specific path first

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import {
   onDiscover,
+  onSearch,
   onSelect,
   onInit,
   onConfirm,
@@ -20,6 +21,7 @@ export const webhookRoutes = () => {
   const router = Router();
 
   router.post("/discover", onDiscover);
+  router.post("/search", onSearch); // compatibility alias
   router.post("/select", onSelect);
   router.post("/init", onInit);
   router.post("/confirm", onConfirm);

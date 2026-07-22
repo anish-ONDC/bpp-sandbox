@@ -7,7 +7,18 @@ export function createApp() {
   const app = express();
   app.use(cors());
   app.use(helmet());
+
+  // TEMP DEBUG: log every incoming request's content-type before parsing,
+  // then its parsed body after. Remove once the empty-context issue is found.
+  app.use((req, _res, next) => {
+    console.log(`[incoming] ${req.method} ${req.originalUrl} content-type=${req.headers["content-type"]}`);
+    next();
+  });
   app.use(express.json({ limit: "5mb" }));
+  app.use((req, _res, next) => {
+    console.log(`[incoming body] ${req.method} ${req.originalUrl}`, JSON.stringify(req.body));
+    next();
+  });
 
   // Create main API router
   const apiRouter = Router();
@@ -26,6 +37,5 @@ export function createApp() {
     req?.log?.error?.(err);
     res.status(err.status || 500).json({ error: "internal_error" });
   });
-
   return app;
 }

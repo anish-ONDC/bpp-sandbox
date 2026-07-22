@@ -21,16 +21,17 @@ const buildAck = (context: any) => {
 };
 
 const buildResponseContext = (
-  context: Record<string, unknown>,
+  context: Record<string, unknown> | undefined,
   action: string
 ) => {
+  const safeContext = context ?? {};
   const result: Record<string, unknown> = {
-    ...context,
+    ...safeContext,
     action: `on_${action}`,
   };
 
   const TIMESTAMP_KEYS = ["timestamp", "time_stamp"] as const;
-  const timestampKey = TIMESTAMP_KEYS.find((k) => k in context);
+  const timestampKey = TIMESTAMP_KEYS.find((k) => k in safeContext);
   if (timestampKey) {
     result[timestampKey] = new Date().toISOString();
   }
@@ -58,6 +59,37 @@ export const onSelect = (req: Request, res: Response) => {
         responsePayload
       );
       console.log("On Select api call response: ", select_data.data);
+    } catch (error: any) {
+      console.log(error);
+    } finally {
+      return;
+    }
+  })();
+  return res.status(200).json(buildAck(context));
+};
+
+// Compatibility alias for BAPs still using the pre-v2.0.0 "search" verb
+// (v2.0.0 renamed search/on_search to discover/on_discover). Reuses the
+// same on_discover.json catalog data, just wired to on_search on the wire.
+export const onSearch = (req: Request, res: Response) => {
+  const { context, message }: { context: any; message: any } = req.body;
+  (async () => {
+    try {
+      const template = await readDomainResponse(resolveDomain(context), "on_discover", getPersona());
+      const responsePayload = {
+        ...template,
+        context: buildResponseContext(context, "search"),
+      };
+      const callbackUrl = getCallbackUrl(context, "search");
+      console.log(
+        "Triggering On Search response to:",
+        callbackUrl
+      );
+      const search_data = await axios.post(
+        callbackUrl,
+        responsePayload
+      );
+      console.log("On Search api call response: ", search_data.data);
     } catch (error: any) {
       console.log(error);
     } finally {

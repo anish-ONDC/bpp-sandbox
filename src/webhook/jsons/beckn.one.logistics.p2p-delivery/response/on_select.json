@@ -1,0 +1,125 @@
+{
+  "context": {
+    "action": "on_select",
+    "version": "2.0.0",
+    "domain": "beckn.one:logistics:p2p-delivery:1.0",
+    "networkId": "beckn.one/logistics-p2p-delivery",
+    "timestamp": "2026-07-20T10:00:05+05:30",
+    "messageId": "msg-on-select-p2p-001",
+    "transactionId": "txn-p2p-delivery-001",
+    "bapId": "buyer-app.example.com",
+    "bapUri": "https://buyer-app.example.com",
+    "bppId": "seller-side-logistics-bpp.example.com",
+    "bppUri": "https://seller-side-logistics-bpp.example.com",
+    "ttl": "PT30S"
+  },
+  "message": {
+    "contract": {
+      "id": "contract-p2p-delivery-001",
+      "descriptor": {
+        "name": "Standard P2P Delivery Quote",
+        "code": "DRAFT"
+      },
+      "status": {
+        "code": "DRAFT",
+        "name": "Quote generated, awaiting init"
+      },
+      "commitments": [
+        {
+          "id": "commitment-p2p-001",
+          "status": {
+            "descriptor": {
+              "code": "DRAFT"
+            }
+          },
+          "resources": [
+            {
+              "id": "resource-p2p-standard",
+              "descriptor": {
+                "name": "Standard P2P Delivery"
+              },
+              "quantity": {
+                "count": 1
+              }
+            }
+          ],
+          "offer": {
+            "id": "offer-p2p-standard-base",
+            "resourceIds": ["resource-p2p-standard"]
+          }
+        }
+      ],
+      "consideration": [
+        {
+          "id": "consideration-total-001",
+          "status": {
+            "code": "QUOTED"
+          },
+          "considerationAttributes": {
+            "@context": "https://schema.org",
+            "@type": "PriceSpecification",
+            "priceCurrency": "INR",
+            "price": 130,
+            "components": [
+              {
+                "type": "BASE_FARE",
+                "value": 80,
+                "currency": "INR",
+                "description": "Standard P2P base fare"
+              },
+              {
+                "type": "DISTANCE_FARE",
+                "value": 50,
+                "currency": "INR",
+                "description": "Distance charge: 5 km x Rs.10/km"
+              }
+            ]
+          }
+        }
+      ],
+      "participants": [
+        {
+          "id": "provider-quick-logistics",
+          "descriptor": {
+            "name": "Quick Logistics Co.",
+            "code": "PROVIDER"
+          }
+        }
+      ],
+      "performance": [
+        {
+          "id": "performance-p2p-001",
+          "status": {
+            "code": "QUOTED"
+          },
+          "commitmentIds": ["commitment-p2p-001"],
+          "performanceAttributes": {
+            "@context": "https://schema.org",
+            "@type": ["beckn:HyperlocalDelivery", "ParcelDelivery"],
+            "originAddress": {
+              "streetAddress": "12 MG Road",
+              "addressLocality": "Bengaluru",
+              "addressRegion": "Karnataka",
+              "postalCode": "560001",
+              "addressCountry": "IN",
+              "geo": { "type": "Point", "coordinates": [77.5946, 12.9716] }
+            },
+            "deliveryAddress": {
+              "streetAddress": "45 Indiranagar 100ft Road",
+              "addressLocality": "Bengaluru",
+              "addressRegion": "Karnataka",
+              "postalCode": "560038",
+              "addressCountry": "IN",
+              "geo": { "type": "Point", "coordinates": [77.6408, 12.9716] }
+            },
+            "distanceKm": 5,
+            "itemShipped": {
+              "@type": "Product",
+              "name": "Standard Package"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
