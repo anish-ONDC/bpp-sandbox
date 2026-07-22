@@ -1,0 +1,50 @@
+{
+  "context": {
+    "action": "select",
+    "version": "2.0.0",
+    "domain": "beckn.one:logistics:p2p-delivery:1.0",
+    "networkId": "beckn.one/logistics-p2p-delivery",
+    "timestamp": "2026-07-20T10:00:05+05:30",
+    "messageId": "msg-select-p2p-001",
+    "transactionId": "txn-p2p-delivery-001",
+    "bapId": "buyer-app.example.com",
+    "bapUri": "http://localhost:3000/api/bap-webhook",
+    "bppId": "seller-side-logistics-bpp.example.com",
+    "bppUri": "http://localhost:3000/api/webhook",
+    "ttl": "PT30S"
+  },
+  "message": {
+    "contract": {
+      "commitments": [
+        {
+          "resources": [
+            { "id": "resource-p2p-standard", "quantity": { "count": 1 } }
+          ],
+          "offer": {
+            "id": "offer-p2p-standard-base",
+            "resourceIds": ["resource-p2p-standard"]
+          },
+          "commitmentAttributes": {
+            "@context": "https://schema.org",
+            "@type": "ParcelDelivery",
+            "originAddress": {
+              "streetAddress": "12 MG Road",
+              "addressLocality": "Bengaluru",
+              "addressRegion": "Karnataka",
+              "postalCode": "560001",
+              "addressCountry": "IN"
+            },
+            "deliveryAddress": {
+              "streetAddress": "45 Indiranagar 100ft Road",
+              "addressLocality": "Bengaluru",
+              "addressRegion": "Karnataka",
+              "postalCode": "560038",
+              "addressCountry": "IN"
+            },
+            "itemShipped": { "@type": "Product", "name": "Standard Package" }
+          }
+        }
+      ]
+    }
+  }
+}

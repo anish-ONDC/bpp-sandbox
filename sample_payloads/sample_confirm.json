@@ -1,0 +1,47 @@
+{
+  "context": {
+    "action": "confirm",
+    "version": "2.0.0",
+    "domain": "beckn.one:logistics:p2p-delivery:1.0",
+    "networkId": "beckn.one/logistics-p2p-delivery",
+    "timestamp": "2026-07-20T10:02:00+05:30",
+    "messageId": "msg-confirm-p2p-001",
+    "transactionId": "txn-p2p-delivery-001",
+    "bapId": "buyer-app.example.com",
+    "bapUri": "http://localhost:3000/api/bap-webhook",
+    "bppId": "seller-side-logistics-bpp.example.com",
+    "bppUri": "http://localhost:3000/api/webhook",
+    "ttl": "PT30S"
+  },
+  "message": {
+    "contract": {
+      "id": "contract-p2p-delivery-001",
+      "commitments": [
+        {
+          "id": "commitment-p2p-001",
+          "resources": [
+            { "id": "resource-p2p-standard", "quantity": { "count": 1 } }
+          ],
+          "offer": {
+            "id": "offer-p2p-standard-base",
+            "resourceIds": ["resource-p2p-standard"]
+          }
+        }
+      ],
+      "settlements": [
+        {
+          "id": "settlement-p2p-001",
+          "considerationId": "consideration-total-001",
+          "status": "DRAFT",
+          "settlementAttributes": {
+            "@context": "https://schema.org",
+            "@type": "PaymentMethod",
+            "paymentType": "POST_FULFILLMENT",
+            "amount": 130,
+            "currency": "INR"
+          }
+        }
+      ]
+    }
+  }
+}
