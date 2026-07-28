@@ -1,18 +1,4 @@
 {
-  "context": {
-    "action": "on_confirm",
-    "version": "2.0.0",
-    "domain": "beckn.one:logistics:p2p-delivery:1.0",
-    "networkId": "beckn.one/logistics-p2p-delivery",
-    "timestamp": "2026-07-20T10:02:00+05:30",
-    "messageId": "msg-on-confirm-p2p-001",
-    "transactionId": "txn-p2p-delivery-001",
-    "bapId": "buyer-app.example.com",
-    "bapUri": "https://buyer-app.example.com",
-    "bppId": "seller-side-logistics-bpp.example.com",
-    "bppUri": "https://seller-side-logistics-bpp.example.com",
-    "ttl": "PT30S"
-  },
   "message": {
     "contract": {
       "id": "contract-p2p-delivery-001",
@@ -45,7 +31,9 @@
           ],
           "offer": {
             "id": "offer-p2p-standard-base",
-            "resourceIds": ["resource-p2p-standard"]
+            "resourceIds": [
+              "resource-p2p-standard"
+            ]
           }
         }
       ],
@@ -58,22 +46,22 @@
           "considerationAttributes": {
             "@context": "https://schema.org",
             "@type": "PriceSpecification",
-            "priceCurrency": "INR",
-            "price": 130,
             "components": [
               {
-                "type": "BASE_FARE",
+                "type": "UNIT",
                 "value": 80,
                 "currency": "INR",
                 "description": "Standard P2P base fare"
               },
               {
-                "type": "DISTANCE_FARE",
+                "type": "DELIVERY",
                 "value": 50,
                 "currency": "INR",
                 "description": "Distance charge: 5 km x Rs.10/km"
               }
-            ]
+            ],
+            "priceCurrency": "INR",
+            "price": 130
           }
         }
       ],
@@ -109,13 +97,17 @@
         {
           "id": "settlement-p2p-001",
           "considerationId": "consideration-total-001",
-          "status": "DRAFT",
+          "status": "COMPLETE",
           "settlementAttributes": {
-            "@context": "https://schema.org",
-            "@type": "PaymentMethod",
-            "paymentType": "POST_FULFILLMENT",
-            "amount": 130,
-            "currency": "INR"
+            "@context": "https://schema.beckn.io",
+            "@type": "PaymentTerm",
+            "type": "POST_FULFILLMENT",
+            "method": "UPI",
+            "amount": {
+              "currency": "INR",
+              "value": 130
+            },
+            "status": "PAID"
           }
         }
       ],
@@ -125,41 +117,59 @@
           "status": {
             "code": "CONFIRMED"
           },
-          "commitmentIds": ["commitment-p2p-001"],
+          "commitmentIds": [
+            "commitment-p2p-001"
+          ],
           "performanceAttributes": {
-            "@context": "https://schema.org",
-            "@type": ["beckn:HyperlocalDelivery", "ParcelDelivery"],
-            "trackingNumber": "TRK-P2P-0001",
-            "carrier": {
-              "@type": "Organization",
-              "name": "Quick Logistics Co."
+            "@context": "https://schema.beckn.io",
+            "@type": "HyperlocalDelivery",
+            "pickupLocation": {
+              "geo": {
+                "type": "Point",
+                "coordinates": [
+                  77.5946,
+                  12.9716
+                ]
+              },
+              "address": {
+                "streetAddress": "12 MG Road",
+                "addressLocality": "Bengaluru",
+                "addressRegion": "Karnataka",
+                "postalCode": "560001",
+                "addressCountry": "IN"
+              }
             },
-            "originAddress": {
-              "streetAddress": "12 MG Road",
-              "addressLocality": "Bengaluru",
-              "addressRegion": "Karnataka",
-              "postalCode": "560001",
-              "addressCountry": "IN",
-              "geo": { "type": "Point", "coordinates": [77.5946, 12.9716] }
+            "deliveryLocation": {
+              "geo": {
+                "type": "Point",
+                "coordinates": [
+                  77.6408,
+                  12.9716
+                ]
+              },
+              "address": {
+                "streetAddress": "45 Indiranagar 100ft Road",
+                "addressLocality": "Bengaluru",
+                "addressRegion": "Karnataka",
+                "postalCode": "560038",
+                "addressCountry": "IN"
+              }
             },
-            "deliveryAddress": {
-              "streetAddress": "45 Indiranagar 100ft Road",
-              "addressLocality": "Bengaluru",
-              "addressRegion": "Karnataka",
-              "postalCode": "560038",
-              "addressCountry": "IN",
-              "geo": { "type": "Point", "coordinates": [77.6408, 12.9716] }
+            "itemsShipped": [
+              {
+                "@context": "https://schema.org",
+                "@type": "Product",
+                "name": "Standard Package"
+              }
+            ],
+            "agent": {
+              "@context": "https://schema.org",
+              "@type": "Person",
+              "name": "Ravi Kumar",
+              "telephone": "+91 98765 43210"
             },
-            "distanceKm": 5,
-            "itemShipped": {
-              "@type": "Product",
-              "name": "Standard Package"
-            },
-            "expectedArrivalUntil": "2026-07-20T10:40:00+05:30",
-            "authorization": {
-              "type": "OTP",
-              "token": "4821"
-            }
+            "trackingUrl": "https://track.quicklogistics.example.com/TRK-P2P-0001",
+            "expectedArrivalUntil": "2026-07-20T10:40:00+05:30"
           }
         }
       ]

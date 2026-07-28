@@ -1,18 +1,4 @@
 {
-  "context": {
-    "action": "on_discover",
-    "version": "2.0.0",
-    "domain": "ONDC:LOG10",
-    "networkId": "ondc.org/logistics",
-    "timestamp": "2026-07-20T10:00:01+05:30",
-    "messageId": "msg-on-discover-p2p-001",
-    "transactionId": "txn-p2p-delivery-001",
-    "bapId": "buyer-app.example.com",
-    "bapUri": "https://buyer-app.example.com",
-    "bppId": "seller-side-logistics-bpp.example.com",
-    "bppUri": "https://seller-side-logistics-bpp.example.com",
-    "ttl": "PT30S"
-  },
   "message": {
     "catalogs": [
       {
@@ -34,7 +20,10 @@
             {
               "geo": {
                 "type": "Point",
-                "coordinates": [77.5946, 12.9716]
+                "coordinates": [
+                  77.5946,
+                  12.9716
+                ]
               },
               "address": {
                 "streetAddress": "12 MG Road",
@@ -75,31 +64,32 @@
                 "name": "Quick Logistics Co."
               }
             },
-            "resourceIds": ["resource-p2p-standard"],
+            "resourceIds": [
+              "resource-p2p-standard"
+            ],
             "considerations": [
               {
                 "id": "consideration-price-preview",
                 "considerationAttributes": {
                   "@context": "https://schema.org",
                   "@type": "PriceSpecification",
-                  "priceCurrency": "INR",
-                  "price": 80,
                   "description": "Base fare only. Final price = base fare + (distance in km x Rs.10/km), computed at /select.",
                   "components": [
                     {
-                      "type": "BASE_FARE",
+                      "type": "UNIT",
                       "value": 80,
                       "currency": "INR",
                       "description": "Standard P2P base fare"
                     },
                     {
-                      "type": "DISTANCE_FARE",
+                      "type": "DELIVERY",
                       "value": 10,
                       "currency": "INR",
-                      "unit": "per_km",
-                      "description": "Distance charge per kilometer"
+                      "description": "Distance charge, per kilometer"
                     }
-                  ]
+                  ],
+                  "priceCurrency": "INR",
+                  "price": 80
                 }
               }
             ],

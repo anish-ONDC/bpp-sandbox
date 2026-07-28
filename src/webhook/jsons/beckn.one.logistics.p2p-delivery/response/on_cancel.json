@@ -1,18 +1,4 @@
 {
-  "context": {
-    "action": "on_cancel",
-    "version": "2.0.0",
-    "domain": "beckn.one:logistics:p2p-delivery:1.0",
-    "networkId": "beckn.one/logistics-p2p-delivery",
-    "timestamp": "2026-07-20T10:05:00+05:30",
-    "messageId": "msg-on-cancel-p2p-001",
-    "transactionId": "txn-p2p-delivery-001",
-    "bapId": "buyer-app.example.com",
-    "bapUri": "https://buyer-app.example.com",
-    "bppId": "seller-side-logistics-bpp.example.com",
-    "bppUri": "https://seller-side-logistics-bpp.example.com",
-    "ttl": "PT30S"
-  },
   "message": {
     "contract": {
       "id": "contract-p2p-delivery-001",
@@ -45,7 +31,9 @@
           ],
           "offer": {
             "id": "offer-p2p-standard-base",
-            "resourceIds": ["resource-p2p-standard"]
+            "resourceIds": [
+              "resource-p2p-standard"
+            ]
           }
         }
       ],
@@ -58,28 +46,28 @@
           "considerationAttributes": {
             "@context": "https://schema.org",
             "@type": "PriceSpecification",
-            "priceCurrency": "INR",
-            "price": 0,
             "components": [
               {
-                "type": "BASE_FARE",
+                "type": "UNIT",
                 "value": 80,
                 "currency": "INR",
                 "description": "Standard P2P base fare"
               },
               {
-                "type": "DISTANCE_FARE",
+                "type": "DELIVERY",
                 "value": 50,
                 "currency": "INR",
                 "description": "Distance charge: 5 km x Rs.10/km"
               },
               {
-                "type": "CANCELLATION_WAIVER",
+                "type": "DISCOUNT",
                 "value": -130,
                 "currency": "INR",
                 "description": "Cancelled before pickup - full waiver, no charge"
               }
-            ]
+            ],
+            "priceCurrency": "INR",
+            "price": 0
           }
         }
       ],
@@ -105,12 +93,15 @@
           "considerationId": "consideration-total-001",
           "status": "COMPLETE",
           "settlementAttributes": {
-            "@context": "https://schema.org",
-            "@type": "PaymentMethod",
-            "paymentType": "REFUND",
-            "amount": 0,
-            "currency": "INR",
-            "note": "No payment was collected prior to cancellation"
+            "@context": "https://schema.beckn.io",
+            "@type": "PaymentTerm",
+            "type": "POST_FULFILLMENT",
+            "method": "UPI",
+            "amount": {
+              "currency": "INR",
+              "value": 0
+            },
+            "status": "REFUNDED"
           }
         }
       ],
@@ -120,13 +111,44 @@
           "status": {
             "code": "CANCELLED"
           },
-          "commitmentIds": ["commitment-p2p-001"],
+          "commitmentIds": [
+            "commitment-p2p-001"
+          ],
           "performanceAttributes": {
-            "@context": "https://schema.org",
-            "@type": ["beckn:HyperlocalDelivery", "ParcelDelivery"],
-            "trackingNumber": "TRK-P2P-0001",
-            "cancellationReason": "Buyer cancelled before courier pickup",
-            "cancelledAt": "2026-07-20T10:05:00+05:30"
+            "@context": "https://schema.beckn.io",
+            "@type": "HyperlocalDelivery",
+            "pickupLocation": {
+              "geo": {
+                "type": "Point",
+                "coordinates": [
+                  77.5946,
+                  12.9716
+                ]
+              },
+              "address": {
+                "streetAddress": "12 MG Road",
+                "addressLocality": "Bengaluru",
+                "addressRegion": "Karnataka",
+                "postalCode": "560001",
+                "addressCountry": "IN"
+              }
+            },
+            "deliveryLocation": {
+              "geo": {
+                "type": "Point",
+                "coordinates": [
+                  77.6408,
+                  12.9716
+                ]
+              },
+              "address": {
+                "streetAddress": "45 Indiranagar 100ft Road",
+                "addressLocality": "Bengaluru",
+                "addressRegion": "Karnataka",
+                "postalCode": "560038",
+                "addressCountry": "IN"
+              }
+            }
           }
         }
       ]

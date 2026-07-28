@@ -1,0 +1,27 @@
+{
+  "message": {
+    "tracking": {
+      "contract": {
+        "id": "contract-p2p-delivery-001",
+        "commitments": [
+          {
+            "id": "commitment-p2p-001",
+            "status": { "descriptor": { "code": "ACTIVE" } },
+            "resources": [
+              { "id": "resource-p2p-standard", "quantity": { "count": 1 } }
+            ],
+            "offer": { "id": "offer-p2p-standard-base", "resourceIds": ["resource-p2p-standard"] }
+          }
+        ]
+      },
+      "status": "ACTIVE",
+      "url": "https://track.quicklogistics.example.com/TRK-P2P-0001",
+      "trackingAttributes": {
+        "@context": "https://schema.org",
+        "@type": "GeoCoordinates",
+        "latitude": 12.9716,
+        "longitude": 77.6150
+      }
+    }
+  }
+}

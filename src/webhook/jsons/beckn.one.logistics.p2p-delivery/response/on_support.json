@@ -1,0 +1,20 @@
+{
+  "message": {
+    "support": {
+      "orderId": "contract-p2p-delivery-001",
+      "descriptor": {
+        "name": "Support ticket for P2P delivery TRK-P2P-0001",
+        "shortDesc": "Assistance requested for an active delivery"
+      },
+      "channels": [
+        {
+          "@context": "https://schema.org",
+          "@type": "ContactPoint",
+          "contactType": "customer support",
+          "telephone": "+91 80 4567 8900",
+          "email": "support@quicklogistics.example.com"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "message": {
+    "ratings": [
+      {
+        "target": {
+          "id": "performance-p2p-001",
+          "descriptor": {
+            "name": "Delivery performance rating"
+          },
+          "targetAttributes": {
+            "@context": "https://schema.org",
+            "@type": "Thing",
+            "additionalType": "DeliveryPerformance"
+          }
+        },
+        "range": { "min": 1, "max": 5 }
+      },
+      {
+        "target": {
+          "id": "courier-agent-001",
+          "descriptor": {
+            "name": "Courier agent rating"
+          }
+        },
+        "range": { "min": 1, "max": 5 }
+      }
+    ]
+  }
+}

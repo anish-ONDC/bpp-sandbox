@@ -5,8 +5,8 @@
     "domain": "beckn.one:logistics:p2p-delivery:1.0",
     "networkId": "beckn.one/logistics-p2p-delivery",
     "timestamp": "2026-07-20T10:05:00+05:30",
-    "messageId": "msg-cancel-p2p-001",
-    "transactionId": "txn-p2p-delivery-001",
+    "messageId": "msg-cancel-retail-001",
+    "transactionId": "txn-retail-shopify-001",
     "bapId": "buyer-app.example.com",
     "bapUri": "http://localhost:3000/api/bap-webhook",
     "bppId": "seller-side-logistics-bpp.example.com",
@@ -15,8 +15,8 @@
   },
   "message": {
     "contract": {
-      "id": "contract-p2p-delivery-001",
-      "cancellationReason": "Buyer cancelled before courier pickup"
+      "id": "contract-txn-retail-shopify-001",
+      "cancellationReason": "Buyer cancelled order"
     }
   }
 }

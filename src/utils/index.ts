@@ -3,41 +3,78 @@ import path from "path";
 
 const RESPONSES_BASE_PATH = path.resolve(__dirname, "../webhook/jsons");
 
+const CONTEXT_FIELD_ALIASES: Record<string, string> = {
+  transaction_id: "transactionId",
+  message_id: "messageId",
+  bap_id: "bapId",
+  bap_uri: "bapUri",
+  bpp_id: "bppId",
+  bpp_uri: "bppUri",
+  network_id: "networkId",
+  sender_id: "senderId",
+  receiver_id: "receiverId",
+};
+
+export const normalizeContext = (
+  context: Record<string, unknown> | undefined | null
+): Record<string, unknown> => {
+  if (!context) {
+    return {};
+  }
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(context)) {
+    const canonicalKey = CONTEXT_FIELD_ALIASES[key] ?? key;
+    if (normalized[canonicalKey] === undefined || CONTEXT_FIELD_ALIASES[key]) {
+      normalized[canonicalKey] = value;
+    }
+  }
+  return normalized;
+};
+
+// networkId ("namespace/registry") and domain ("a:b:c:1.0") are structurally
+// different, so known networkId values are mapped explicitly rather than
+// guessed at.
+const KNOWN_NETWORK_ID_FOLDER_ALIASES: Record<string, string> = {
+  "beckn.one/logistics-p2p-delivery": "beckn.one.logistics.p2p-delivery",
+};
+
 export const normalizeDomain = (domain: string) => {
   if (!domain) {
     return domain;
   }
-  // replace colons with dots for Windows-compatible dir names, then strip version suffix
-  return domain.replace(/:/g, ".").replace(/\.\d+(?:\.\d+)*$/, "");
+  if (KNOWN_NETWORK_ID_FOLDER_ALIASES[domain]) {
+    return KNOWN_NETWORK_ID_FOLDER_ALIASES[domain];
+  }
+  return domain
+    .replace(/[:/]/g, ".")
+    .replace(/\.\d+(?:\.\d+)*$/, "");
 };
 
-/**
- * Resolves the domain identifier from a beckn context object.
- * Falls back to networkId if domain is absent.
- */
-export const resolveDomain = (context: any): string | undefined => {
+export const resolveNetworkId = (
+  context: Record<string, unknown> | undefined
+): string | undefined => {
   if (!context) {
     return undefined;
   }
-  return context.domain || context.network_id || context.networkId;
+  const value = context.networkId ?? context.domain;
+  return typeof value === "string" ? value : undefined;
 };
 
-export const readDomainResponse = async (
-  domain: string | undefined,
+export const readNetworkResponse = async (
+  networkId: string | undefined,
   action: string,
   persona?: string
 ) => {
-  if (!domain) {
-    console.warn(`readDomainResponse called with no domain (action: ${action}), returning empty object`);
+  if (!networkId) {
+    console.warn(`readNetworkResponse called with no networkId (action: ${action}), returning empty object`);
     return {};
   }
-  const normalizedDomain = normalizeDomain(domain);
+  const normalizedNetworkId = normalizeDomain(networkId);
 
-  // If persona is specified, try persona-specific path first
   if (persona) {
     const personaPath = path.join(
       RESPONSES_BASE_PATH,
-      normalizedDomain,
+      normalizedNetworkId,
       "response",
       persona,
       `${action}.json`
@@ -51,14 +88,12 @@ export const readDomainResponse = async (
       if (error?.code !== "ENOENT") {
         throw error;
       }
-      // Fall through to default path if persona file not found
     }
   }
 
-  // Default path (backward compatible)
   const targetPath = path.join(
     RESPONSES_BASE_PATH,
-    normalizedDomain,
+    normalizedNetworkId,
     "response",
     `${action}.json`
   );
@@ -75,4 +110,3 @@ export const readDomainResponse = async (
     throw error;
   }
 };
-

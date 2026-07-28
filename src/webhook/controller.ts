@@ -1,452 +1,542 @@
 import { Request, Response } from "express";
 import axios from "axios";
-import { readDomainResponse, resolveDomain } from "../utils";
-
-const getCallbackUrl = (context: any, action: string): string => {
-  const callbackBase = process.env.BPP_CALLBACK_ENDPOINT;
-  if (callbackBase) {
-    return `${callbackBase.replace(/\/$/, '')}/on_${action}`;
-  }
-  const bpp_url = context.bpp_uri || context.bpp_url || context.bppUri || context.bppUrl;
-  const full_bpp_url = new URL(bpp_url);
-  return `${full_bpp_url.origin}/bpp/caller/on_${action}`;
-};
+import { readNetworkResponse, resolveNetworkId, normalizeContext } from "../utils";
+import { fetchShopifyCatalog, fetchShopifyOfferById, parseShopifyProductId } from "../integrations/shopify";
+import { saveSelection, getSelection } from "../utils/transactionStore";
 
 const getPersona = (): string | undefined => {
   return process.env.PERSONA;
 };
 
-const buildAck = (context: any) => {
-  return { message: { status: "ACK", messageId: context?.messageId ?? context?.message_id ?? "" } };
+const getCallbackUrl = (context: Record<string, unknown>, action: string): string => {
+  const callbackBase = process.env.BPP_CALLBACK_ENDPOINT;
+  if (callbackBase) {
+    return `${callbackBase.replace(/\/$/, "")}/on_${action}`;
+  }
+  const bapUri = context.bapUri;
+  if (typeof bapUri !== "string" || !bapUri) {
+    throw new Error(
+      "Cannot determine callback URL: BPP_CALLBACK_ENDPOINT is unset and context.bapUri is missing"
+    );
+  }
+  return `${new URL(bapUri).origin}/on_${action}`;
+};
+
+const logCallbackError = (action: string, error: any) => {
+  if (error?.isAxiosError) {
+    console.log(`on_${action} callback failed: ${error.code ?? "ERROR"} — ${error.message}`);
+    return;
+  }
+  console.log(`on_${action} callback failed:`, error?.message ?? error);
+};
+
+const buildAckResponse = (context: Record<string, unknown>) => ({
+  message: {
+    status: "ACK",
+    messageId: (context.messageId as string) ?? "",
+  },
+});
+
+const buildNackResponse = (
+  context: Record<string, unknown>,
+  code: string,
+  message: string
+) => ({
+  message: {
+    status: "NACK",
+    messageId: (context.messageId as string) ?? "",
+    error: { code, message },
+  },
+});
+
+const REQUIRED_CONTEXT_FIELDS = ["action", "version", "transactionId", "messageId"] as const;
+
+const validateRequest = (
+  req: Request,
+  res: Response
+): { context: Record<string, unknown>; message: unknown } | null => {
+  const rawContext = req.body?.context;
+
+  if (!rawContext || typeof rawContext !== "object") {
+    res.status(400).json(buildNackResponse({}, "CTX_MISSING_FIELD", "context is required"));
+    return null;
+  }
+
+  const context = normalizeContext(rawContext);
+
+  for (const field of REQUIRED_CONTEXT_FIELDS) {
+    if (!context[field]) {
+      res
+        .status(400)
+        .json(buildNackResponse(context, "CTX_MISSING_FIELD", `context.${field} is required`));
+      return null;
+    }
+  }
+
+  if (!context.bapId && !context.bppId) {
+    res
+      .status(400)
+      .json(
+        buildNackResponse(context, "CTX_MISSING_FIELD", "context.bapId or context.bppId is required")
+      );
+    return null;
+  }
+
+  if (req.body?.message === undefined) {
+    res
+      .status(400)
+      .json(buildNackResponse(context, "SCH_REQUIRED_FIELD_MISSING", "message is required"));
+    return null;
+  }
+
+  return { context, message: req.body.message };
 };
 
 const buildResponseContext = (
-  context: Record<string, unknown> | undefined,
+  context: Record<string, unknown>,
   action: string
-) => {
-  const safeContext = context ?? {};
+): Record<string, unknown> => {
   const result: Record<string, unknown> = {
-    ...safeContext,
+    ...context,
     action: `on_${action}`,
   };
-
-  const TIMESTAMP_KEYS = ["timestamp", "time_stamp"] as const;
-  const timestampKey = TIMESTAMP_KEYS.find((k) => k in safeContext);
-  if (timestampKey) {
-    result[timestampKey] = new Date().toISOString();
+  if ("timestamp" in context) {
+    result.timestamp = new Date().toISOString();
   }
-
   return result;
 };
 
-export const onSelect = (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-  // on_select_response.context = { ...context, action: "on_select" };
+const performAction = (
+  req: Request,
+  res: Response,
+  action: string,
+  templateAction: string = `on_${action}`
+) => {
+  const validated = validateRequest(req, res);
+  if (!validated) {
+    return;
+  }
+  const { context } = validated;
+
   (async () => {
     try {
-      const template = await readDomainResponse(resolveDomain(context), "on_select", getPersona());
+      const template = await readNetworkResponse(resolveNetworkId(context), templateAction, getPersona());
       const responsePayload = {
         ...template,
-        context: buildResponseContext(context, "select"),
+        context: buildResponseContext(context, action),
       };
-      const callbackUrl = getCallbackUrl(context, "select");
-      console.log(
-        "Triggering On Select response to:",
-        callbackUrl
-      );
-      const select_data = await axios.post(
-        callbackUrl,
-        responsePayload
-      );
-      console.log("On Select api call response: ", select_data.data);
+      const callbackUrl = getCallbackUrl(context, action);
+      console.log(`Triggering on_${action} response to:`, callbackUrl);
+      const { data } = await axios.post(callbackUrl, responsePayload);
+      console.log(`on_${action} callback response:`, data);
     } catch (error: any) {
-      console.log(error);
-    } finally {
-      return;
+      logCallbackError(action, error);
     }
   })();
-  return res.status(200).json(buildAck(context));
+
+  return res.status(200).json(buildAckResponse(context));
 };
 
-// Compatibility alias for BAPs still using the pre-v2.0.0 "search" verb
-// (v2.0.0 renamed search/on_search to discover/on_discover). Reuses the
-// same on_discover.json catalog data, just wired to on_search on the wire.
-export const onSearch = (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
+const performTrigger = (req: Request, res: Response, action: string) => {
+  const validated = validateRequest(req, res);
+  if (!validated) {
+    return;
+  }
+  const { context, message } = validated;
+
   (async () => {
     try {
-      const template = await readDomainResponse(resolveDomain(context), "on_discover", getPersona());
-      const responsePayload = {
-        ...template,
-        context: buildResponseContext(context, "search"),
-      };
-      const callbackUrl = getCallbackUrl(context, "search");
-      console.log(
-        "Triggering On Search response to:",
-        callbackUrl
-      );
-      const search_data = await axios.post(
-        callbackUrl,
-        responsePayload
-      );
-      console.log("On Search api call response: ", search_data.data);
+      const responsePayload = { message, context: buildResponseContext(context, action) };
+      const callbackUrl = getCallbackUrl(context, action);
+      console.log(`Triggering on_${action} response to:`, callbackUrl);
+      const { data } = await axios.post(callbackUrl, responsePayload);
+      console.log(`on_${action} callback response:`, data);
     } catch (error: any) {
-      console.log(error);
-    } finally {
-      return;
+      logCallbackError(action, error);
     }
   })();
-  return res.status(200).json(buildAck(context));
+
+  return res.status(200).json(buildAckResponse(context));
+};
+
+const buildDiscoverMessage = async (
+  context: Record<string, unknown>
+): Promise<Record<string, unknown>> => {
+  if (process.env.SHOPIFY_SHOP && process.env.SHOPIFY_ADMIN_API_TOKEN) {
+    try {
+      const catalog = await fetchShopifyCatalog();
+      return { message: { catalogs: [catalog] } };
+    } catch (error: any) {
+      console.log("Shopify catalog fetch failed, falling back to static template:", error?.message ?? error);
+    }
+  }
+  return readNetworkResponse(resolveNetworkId(context), "on_discover", getPersona());
 };
 
 export const onDiscover = (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-  // on_discover_response.context = { ...context, action: "on_discover" };
+  const validated = validateRequest(req, res);
+  if (!validated) {
+    return;
+  }
+  const { context } = validated;
+
   (async () => {
     try {
-      const template = await readDomainResponse(resolveDomain(context), "on_discover", getPersona());
+      const template = await buildDiscoverMessage(context);
       const responsePayload = {
         ...template,
         context: buildResponseContext(context, "discover"),
       };
       const callbackUrl = getCallbackUrl(context, "discover");
-      console.log(
-        "Triggering On Discover response to:",
-        callbackUrl
-      );
-      const discover_data = await axios.post(
-        callbackUrl,
-        responsePayload
-      );
-      console.log("On Discover api call response: ", discover_data.data);
+      console.log("Triggering on_discover response to:", callbackUrl);
+      const { data } = await axios.post(callbackUrl, responsePayload);
+      console.log("on_discover callback response:", data);
     } catch (error: any) {
-      console.log(error);
-    } finally {
-      return;
+      logCallbackError("discover", error);
     }
   })();
-  return res.status(200).json(buildAck(context));
+
+  return res.status(200).json(buildAckResponse(context));
 };
 
-export const onInit = (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-  // on_init_response.context = { ...context, action: "on_init" };
-  (async () => {
+const buildSelectMessage = async (
+  context: Record<string, unknown>,
+  message: any
+): Promise<Record<string, unknown>> => {
+  const selectedOffer = message?.contract?.commitments?.[0]?.offer;
+  const selectedResource = message?.contract?.commitments?.[0]?.resources?.[0];
+  const productId =
+    parseShopifyProductId(selectedOffer?.id) ?? parseShopifyProductId(selectedResource?.id);
+
+  if (productId) {
     try {
-      const template = await readDomainResponse(resolveDomain(context), "on_init", getPersona());
-      const responsePayload = {
-        ...template,
-        context: buildResponseContext(context, "init"),
-      };
-      const callbackUrl = getCallbackUrl(context, "init");
-      console.log(
-        "Triggering On Init response to:",
-        callbackUrl
-      );
-      const init_data = await axios.post(
-        callbackUrl,
-        responsePayload
-      );
-      console.log("On Init api call response: ", init_data.data);
+      const mapped = await fetchShopifyOfferById(productId);
+      if (mapped) {
+        const transactionId = context.transactionId as string;
+        const quantity = selectedResource?.quantity?.count ?? 1;
+        const resourceId = (mapped.resource as any).id as string;
+        const offerId = (mapped.offer as any).id as string;
+
+        saveSelection(transactionId, {
+          productId,
+          resourceId,
+          offerId,
+          quantity,
+          price: mapped.price,
+          currency: mapped.currency,
+        });
+
+        return {
+          message: {
+            contract: {
+              id: `contract-${transactionId}`,
+              status: { code: "DRAFT", name: "Quote generated, awaiting init" },
+              commitments: [
+                {
+                  id: `commitment-${transactionId}`,
+                  status: { descriptor: { code: "DRAFT" } },
+                  resources: [{ id: resourceId, quantity: { count: quantity } }],
+                  offer: { id: offerId, resourceIds: [resourceId] },
+                },
+              ],
+              consideration: [
+                {
+                  id: `consideration-${transactionId}`,
+                  status: { code: "QUOTED" },
+                  considerationAttributes: {
+                    "@context": "https://schema.org",
+                    "@type": "PriceSpecification",
+                    priceCurrency: mapped.currency,
+                    price: mapped.price * quantity,
+                  },
+                },
+              ],
+              participants: [
+                {
+                  id: `provider-${process.env.SHOPIFY_SHOP}`,
+                  descriptor: { name: process.env.SHOPIFY_SHOP as string, code: "PROVIDER" },
+                },
+              ],
+            },
+          },
+        };
+      }
     } catch (error: any) {
-      console.log(error);
-    } finally {
-      return;
+      console.log("Shopify product lookup failed for select, falling back to static template:", error?.message ?? error);
     }
-  })();
-  return res.status(200).json(buildAck(context));
-};
-
-export const onConfirm = (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-  // on_confirm_response.context = { ...context, action: "on_confirm" };
-  (async () => {
-    try {
-      const template = await readDomainResponse(resolveDomain(context), "on_confirm", getPersona());
-      const responsePayload = {
-        ...template,
-        context: buildResponseContext(context, "confirm"),
-      };
-      const callbackUrl = getCallbackUrl(context, "confirm");
-      console.log(
-        "Triggering On Confirm response to:",
-        callbackUrl
-      );
-      const confirm_data = await axios.post(
-        callbackUrl,
-        responsePayload
-      );
-      console.log("On Confirm api call response: ", confirm_data.data);
-    } catch (error: any) {
-      console.log(error);
-    } finally {
-      return;
-    }
-  })();
-  return res.status(200).json(buildAck(context));
-};
-
-export const onStatus = (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-  // on_status_response.context = { ...context, action: "on_status" };
-  (async () => {
-    try {
-      const template = await readDomainResponse(resolveDomain(context), "on_status", getPersona());
-      const responsePayload = {
-        ...template,
-        context: buildResponseContext(context, "status"),
-      };
-      const callbackUrl = getCallbackUrl(context, "status");
-      console.log(
-        "Triggering On Status response to:",
-        callbackUrl
-      );
-      const status_data = await axios.post(
-        callbackUrl,
-        responsePayload
-      );
-      console.log("On Status api call response: ", status_data.data);
-    } catch (error: any) {
-      console.log(error);
-    } finally {
-      return;
-    }
-  })();
-  return res.status(200).json(buildAck(context));
-};
-
-export const onUpdate = (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-  // on_update_response.context = { ...context, action: "on_update" };
-  (async () => {
-    try {
-      const template = await readDomainResponse(resolveDomain(context), "on_update", getPersona());
-      const responsePayload = {
-        ...template,
-        context: buildResponseContext(context, "update"),
-      };
-      const callbackUrl = getCallbackUrl(context, "update");
-      console.log(
-        "Triggering On Update response to:",
-        callbackUrl
-      );
-      const update_data = await axios.post(
-        callbackUrl,
-        responsePayload
-      );
-      console.log("On Update api call response: ", update_data.data);
-    } catch (error: any) {
-      console.log(error);
-    } finally {
-      return;
-    }
-  })();
-  return res.status(200).json(buildAck(context));
-};
-
-export const onRating = (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-
-  // on_rating_response.context = { ...context, action: "on_rating" };
-  (async () => {
-    try {
-      const template = await readDomainResponse(resolveDomain(context), "on_rating", getPersona());
-      const responsePayload = {
-        ...template,
-        context: buildResponseContext(context, "rating"),
-      };
-      const callbackUrl = getCallbackUrl(context, "rating");
-      console.log(
-        "Triggering On Rating response to:",
-        callbackUrl
-      );
-      const rating_data = await axios.post(
-        callbackUrl,
-        responsePayload
-      );
-      console.log("On Rating api call response: ", rating_data.data);
-    } catch (error: any) {
-      console.log(error);
-    } finally {
-      return;
-    }
-  })();
-  return res.status(200).json(buildAck(context));
-};
-
-export const onRate = (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-
-  // on_rating_response.context = { ...context, action: "on_rating" };
-  (async () => {
-    try {
-      const template = await readDomainResponse(resolveDomain(context), "on_rate", getPersona());
-      const responsePayload = {
-        ...template,
-        context: buildResponseContext(context, "rate"),
-      };
-      const callbackUrl = getCallbackUrl(context, "rate");
-      console.log(
-        "Triggering On Rate response to:",
-        callbackUrl
-      );
-      const rating_data = await axios.post(
-        callbackUrl,
-        responsePayload
-      );
-      console.log("On Rate api call response: ", rating_data.data);
-    } catch (error: any) {
-      console.log(error);
-    } finally {
-      return;
-    }
-  })();
-  return res.status(200).json(buildAck(context));
-};
-
-export const onSupport = (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-  // on_support_response.context = { ...context, action: "on_support" };
-  (async () => {
-    try {
-      const template = await readDomainResponse(resolveDomain(context), "on_support", getPersona());
-      const responsePayload = {
-        ...template,
-        context: buildResponseContext(context, "support"),
-      };
-      const callbackUrl = getCallbackUrl(context, "support");
-      console.log(
-        "Triggering On Support response to:",
-        callbackUrl
-      );
-      const support_data = await axios.post(
-        callbackUrl,
-        responsePayload
-      );
-      console.log("On Support api call response: ", support_data.data);
-    } catch (error: any) {
-      console.log(error);
-    } finally {
-      return;
-    }
-  })();
-  return res.status(200).json(buildAck(context));
-};
-
-export const onTrack = (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-  // on_track_response.context = { ...context, action: "on_track" };
-  (async () => {
-    try {
-      const template = await readDomainResponse(resolveDomain(context), "on_track", getPersona());
-      const responsePayload = {
-        ...template,
-        context: buildResponseContext(context, "track"),
-      };
-      const callbackUrl = getCallbackUrl(context, "track");
-      console.log(
-        "Triggering On Track response to:",
-        callbackUrl
-      );
-      const track_data = await axios.post(
-        callbackUrl,
-        responsePayload
-      );
-      console.log("On Track api call response: ", track_data.data);
-    } catch (error: any) {
-      console.log(error);
-    } finally {
-      return;
-    }
-  })();
-  return res.status(200).json(buildAck(context));
-};
-
-export const onCancel = (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-  // on_cancel_response.context = { ...context, action: "on_cancel" };
-  (async () => {
-    try {
-      const template = await readDomainResponse(resolveDomain(context), "on_cancel", getPersona());
-      const responsePayload = {
-        ...template,
-        context: buildResponseContext(context, "cancel"),
-      };
-      const callbackUrl = getCallbackUrl(context, "cancel");
-      console.log(
-        "Triggering On Cancel response to:",
-        callbackUrl
-      );
-      const cancel_data = await axios.post(
-        callbackUrl,
-        responsePayload
-      );
-      console.log("On Cancel api call response: ", cancel_data.data);
-    } catch (error: any) {
-      console.log(error);
-    } finally {
-      return;
-    }
-  })();
-  return res.status(200).json(buildAck(context));
-};
-
-export const triggerOnStatus = async (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-
-  try {
-    const callbackUrl = getCallbackUrl(context, "status");
-    console.log(
-      "Triggering On Status response to:",
-      callbackUrl
-    );
-    const status_data = await axios.post(
-      callbackUrl,
-      { context, message }
-    );
-    console.log("On Status api call response: ", status_data.data);
-  } catch (error: any) {
-    console.log(error);
   }
 
-  return res.status(200).json(buildAck(context));
+  return readNetworkResponse(resolveNetworkId(context), "on_select", getPersona());
 };
 
-export const triggerOnUpdate = async (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
-  try {
-    const callbackUrl = getCallbackUrl(context, "update");
-    console.log(
-      "Triggering On Update response to:",
-      callbackUrl
-    );
-    const update_data = await axios.post(
-      callbackUrl,
-      { context, message }
-    );
-    console.log("On Update api call response: ", update_data.data);
-  } catch (error: any) {
-    console.log(error);
+export const onSelect = (req: Request, res: Response) => {
+  const validated = validateRequest(req, res);
+  if (!validated) {
+    return;
   }
-  return res.status(200).json(buildAck(context));
+  const { context, message } = validated;
+
+  (async () => {
+    try {
+      const template = await buildSelectMessage(context, message);
+      const responsePayload = {
+        ...template,
+        context: buildResponseContext(context, "select"),
+      };
+      const callbackUrl = getCallbackUrl(context, "select");
+      console.log("Triggering on_select response to:", callbackUrl);
+      const { data } = await axios.post(callbackUrl, responsePayload);
+      console.log("on_select callback response:", data);
+    } catch (error: any) {
+      logCallbackError("select", error);
+    }
+  })();
+
+  return res.status(200).json(buildAckResponse(context));
 };
 
-export const triggerOnCancel = async (req: Request, res: Response) => {
-  const { context, message }: { context: any; message: any } = req.body;
+// Maps PaymentTerm.status (settlementAttributes.status) to the outer
+// Settlement.status enum (DRAFT | COMMITTED | COMPLETE per beckn2.yaml) —
+// the two are related but distinct fields and must stay consistent.
+const SETTLEMENT_STATUS_MAP: Record<string, string> = {
+  NOT_PAID: "DRAFT",
+  PENDING: "COMMITTED",
+  PARTIALLY_PAID: "COMMITTED",
+  PAID: "COMPLETE",
+  REFUNDED: "COMPLETE",
+  FAILED: "DRAFT",
+};
 
-  try {
-    const callbackUrl = getCallbackUrl(context, "cancel");
-    console.log(
-      "Triggering On Cancel response to:",
-      callbackUrl
-    );
-    const cancel_data = await axios.post(
-      callbackUrl,
-      { context, message }
-    );
-    console.log("On Cancel api call response: ", cancel_data.data);
-  } catch (error: any) {
-    console.log(error);
+interface DynamicContractOptions {
+  contractStatus: { code: string; name: string };
+  commitmentStatusCode: string;
+  considerationStatus: string;
+  settlement?: { status: string };
+  performance?: { status: string };
+  extraParticipants?: any[];
+}
+
+/**
+ * Rebuilds a Contract for a transaction that was actually selected against a
+ * real Shopify product (looked up via the store populated at /select).
+ * Returns undefined if this transaction was never a real Shopify selection
+ * (e.g. it used a legacy static ID) — callers fall back to the static
+ * template in that case, same safety-net pattern as everywhere else.
+ */
+const buildDynamicContractMessage = async (
+  transactionId: string,
+  options: DynamicContractOptions
+): Promise<Record<string, unknown> | undefined> => {
+  const selection = getSelection(transactionId);
+  if (!selection) {
+    return undefined;
   }
-  return res.status(200).json(buildAck(context));
+
+  const mapped = await fetchShopifyOfferById(selection.productId);
+  if (!mapped) {
+    return undefined;
+  }
+
+  const resourceId = (mapped.resource as any).id as string;
+  const offerId = (mapped.offer as any).id as string;
+  const total = mapped.price * selection.quantity;
+
+  const contract: Record<string, unknown> = {
+    id: `contract-${transactionId}`,
+    status: options.contractStatus,
+    commitments: [
+      {
+        id: `commitment-${transactionId}`,
+        status: { descriptor: { code: options.commitmentStatusCode } },
+        resources: [{ id: resourceId, quantity: { count: selection.quantity } }],
+        offer: { id: offerId, resourceIds: [resourceId] },
+      },
+    ],
+    consideration: [
+      {
+        id: `consideration-${transactionId}`,
+        status: { code: options.considerationStatus },
+        considerationAttributes: {
+          "@context": "https://schema.org",
+          "@type": "PriceSpecification",
+          priceCurrency: mapped.currency,
+          price: total,
+        },
+      },
+    ],
+    participants: [
+      {
+        id: `provider-${process.env.SHOPIFY_SHOP}`,
+        descriptor: { name: process.env.SHOPIFY_SHOP as string, code: "PROVIDER" },
+      },
+      ...(options.extraParticipants ?? []),
+    ],
+  };
+
+  if (options.settlement) {
+    contract.settlements = [
+      {
+        id: `settlement-${transactionId}`,
+        considerationId: `consideration-${transactionId}`,
+        status: SETTLEMENT_STATUS_MAP[options.settlement.status] ?? "DRAFT",
+        settlementAttributes: {
+          "@context": "https://schema.beckn.io",
+          "@type": "PaymentTerm",
+          type: "POST_FULFILLMENT",
+          method: "UPI",
+          amount: { currency: mapped.currency, value: total },
+          status: options.settlement.status,
+        },
+      },
+    ];
+  }
+
+  if (options.performance) {
+    contract.performance = [
+      {
+        id: `performance-${transactionId}`,
+        status: { code: options.performance.status },
+        commitmentIds: [`commitment-${transactionId}`],
+      },
+    ];
+  }
+
+  return { message: { contract } };
 };
+
+/** Shared validate -> build -> ACK -> async-callback flow for the dynamic actions below. */
+const performDynamicAction = (
+  req: Request,
+  res: Response,
+  action: string,
+  buildMessage: (context: Record<string, unknown>, message: any) => Promise<Record<string, unknown>>
+) => {
+  const validated = validateRequest(req, res);
+  if (!validated) {
+    return;
+  }
+  const { context, message } = validated;
+
+  (async () => {
+    try {
+      const template = await buildMessage(context, message);
+      const responsePayload = { ...template, context: buildResponseContext(context, action) };
+      const callbackUrl = getCallbackUrl(context, action);
+      console.log(`Triggering on_${action} response to:`, callbackUrl);
+      const { data } = await axios.post(callbackUrl, responsePayload);
+      console.log(`on_${action} callback response:`, data);
+    } catch (error: any) {
+      logCallbackError(action, error);
+    }
+  })();
+
+  return res.status(200).json(buildAckResponse(context));
+};
+
+const buildInitMessage = async (
+  context: Record<string, unknown>,
+  message: any
+): Promise<Record<string, unknown>> => {
+  const transactionId = context.transactionId as string;
+  try {
+    const buyerParticipant = message?.contract?.participants?.find(
+      (p: any) => p?.descriptor?.code === "BUYER"
+    );
+    const dynamic = await buildDynamicContractMessage(transactionId, {
+      contractStatus: { code: "DRAFT", name: "Final terms ready, awaiting confirm" },
+      commitmentStatusCode: "DRAFT",
+      considerationStatus: "FINALIZED",
+      settlement: { status: "NOT_PAID" },
+      extraParticipants: buyerParticipant ? [buyerParticipant] : [],
+    });
+    if (dynamic) {
+      return dynamic;
+    }
+  } catch (error: any) {
+    console.log("Dynamic init failed, falling back to static template:", error?.message ?? error);
+  }
+  return readNetworkResponse(resolveNetworkId(context), "on_init", getPersona());
+};
+
+const buildConfirmMessage = async (
+  context: Record<string, unknown>,
+  message: any
+): Promise<Record<string, unknown>> => {
+  const transactionId = context.transactionId as string;
+  try {
+    const buyerParticipant = message?.contract?.participants?.find(
+      (p: any) => p?.descriptor?.code === "BUYER"
+    );
+    const dynamic = await buildDynamicContractMessage(transactionId, {
+      contractStatus: { code: "ACTIVE", name: "Order confirmed" },
+      commitmentStatusCode: "ACTIVE",
+      considerationStatus: "CONFIRMED",
+      settlement: { status: "PAID" },
+      performance: { status: "CONFIRMED" },
+      extraParticipants: buyerParticipant ? [buyerParticipant] : [],
+    });
+    if (dynamic) {
+      return dynamic;
+    }
+  } catch (error: any) {
+    console.log("Dynamic confirm failed, falling back to static template:", error?.message ?? error);
+  }
+  return readNetworkResponse(resolveNetworkId(context), "on_confirm", getPersona());
+};
+
+const buildStatusMessage = async (context: Record<string, unknown>): Promise<Record<string, unknown>> => {
+  const transactionId = context.transactionId as string;
+  try {
+    const dynamic = await buildDynamicContractMessage(transactionId, {
+      contractStatus: { code: "ACTIVE", name: "Order processing" },
+      commitmentStatusCode: "ACTIVE",
+      considerationStatus: "CONFIRMED",
+      settlement: { status: "PAID" },
+      performance: { status: "IN_PROGRESS" },
+    });
+    if (dynamic) {
+      return dynamic;
+    }
+  } catch (error: any) {
+    console.log("Dynamic status failed, falling back to static template:", error?.message ?? error);
+  }
+  return readNetworkResponse(resolveNetworkId(context), "on_status", getPersona());
+};
+
+const buildCancelMessage = async (context: Record<string, unknown>): Promise<Record<string, unknown>> => {
+  const transactionId = context.transactionId as string;
+  try {
+    const dynamic = await buildDynamicContractMessage(transactionId, {
+      contractStatus: { code: "CANCELLED", name: "Cancelled by buyer" },
+      commitmentStatusCode: "CLOSED",
+      considerationStatus: "CANCELLED",
+      settlement: { status: "REFUNDED" },
+    });
+    if (dynamic) {
+      return dynamic;
+    }
+  } catch (error: any) {
+    console.log("Dynamic cancel failed, falling back to static template:", error?.message ?? error);
+  }
+  return readNetworkResponse(resolveNetworkId(context), "on_cancel", getPersona());
+};
+
+export const onInit = (req: Request, res: Response) => performDynamicAction(req, res, "init", buildInitMessage);
+export const onConfirm = (req: Request, res: Response) =>
+  performDynamicAction(req, res, "confirm", buildConfirmMessage);
+export const onStatus = (req: Request, res: Response) =>
+  performDynamicAction(req, res, "status", (context) => buildStatusMessage(context));
+export const onCancel = (req: Request, res: Response) =>
+  performDynamicAction(req, res, "cancel", (context) => buildCancelMessage(context));
+export const onUpdate = (req: Request, res: Response) => performAction(req, res, "update");
+export const onTrack = (req: Request, res: Response) => performAction(req, res, "track");
+export const onSupport = (req: Request, res: Response) => performAction(req, res, "support");
+export const onRate = (req: Request, res: Response) => performAction(req, res, "rate");
+
+// pre-v2 aliases, kept for backward compat
+export const onSearch = (req: Request, res: Response) => performAction(req, res, "search", "on_discover");
+export const onRating = (req: Request, res: Response) => performAction(req, res, "rating", "on_rating");
+
+export const triggerOnStatus = (req: Request, res: Response) => performTrigger(req, res, "status");
+export const triggerOnCancel = (req: Request, res: Response) => performTrigger(req, res, "cancel");
+export const triggerOnUpdate = (req: Request, res: Response) => performTrigger(req, res, "update");

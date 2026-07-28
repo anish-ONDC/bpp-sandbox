@@ -3,12 +3,12 @@
     "contract": {
       "id": "contract-p2p-delivery-001",
       "descriptor": {
-        "name": "Standard P2P Delivery - In Transit",
+        "name": "Standard P2P Delivery - Update Accepted",
         "code": "ACTIVE"
       },
       "status": {
         "code": "ACTIVE",
-        "name": "Courier en route to drop location"
+        "name": "Delivery ETA revised"
       },
       "commitments": [
         {
@@ -169,7 +169,7 @@
               "telephone": "+91 98765 43210"
             },
             "trackingUrl": "https://track.quicklogistics.example.com/TRK-P2P-0001",
-            "expectedArrivalUntil": "2026-07-20T10:40:00+05:30"
+            "expectedArrivalUntil": "2026-07-20T11:10:00+05:30"
           }
         }
       ]
