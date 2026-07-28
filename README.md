@@ -2,7 +2,7 @@
 
 Seller-side implementation (BPP — Beckn Provider Platform) for a retail use case, built on the [Beckn Sandbox](https://github.com/beckn/sandbox) for the [Beckn v2.0.0 protocol](https://github.com/beckn/protocol-specifications-new).
 
-This branch pulls the actual catalog from a live Shopify store instead of returning static demo data. `/discover` and `/select` hit Shopify's Admin API directly and return real products, real prices, real stock — and `/init`, `/confirm`, `/status`, `/cancel` carry that same real product through the rest of the order lifecycle. If Shopify isn't reachable for any reason (bad token, store down, not configured), everything falls back to the old static JSON templates instead of failing — so a demo never just breaks because Shopify hiccuped.
+This branch pulls the actual catalog from a live Shopify store instead of returning static demo data. `/discover` and `/select` hit Shopify's Admin API directly and return real products, real prices, real stock — and `/init`, `/confirm`, `/status`, `/cancel` carry that same real product through the rest of the order lifecycle. If Shopify isn't reachable for any reason (bad token, store down, not configured), everything falls back to the old static JSON templates instead of failing.
 
 ## How it works
 
