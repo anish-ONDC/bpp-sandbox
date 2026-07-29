@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import axios from "axios";
+import { appendFileSync, mkdirSync } from "fs";
+import path from "path";
 import { readNetworkResponse, resolveNetworkId, normalizeContext } from "../utils";
 import { fetchShopifyCatalog, fetchShopifyOfferById, parseShopifyProductId } from "../integrations/shopify";
 import { saveSelection, getSelection } from "../utils/transactionStore";
@@ -22,12 +24,49 @@ const getCallbackUrl = (context: Record<string, unknown>, action: string): strin
   return `${new URL(bapUri).origin}/on_${action}`;
 };
 
-const logCallbackError = (action: string, error: any) => {
-  if (error?.isAxiosError) {
-    console.log(`on_${action} callback failed: ${error.code ?? "ERROR"} — ${error.message}`);
-    return;
+// Persists every on_<action> callback attempt (delivered or failed) to disk,
+// since console output scrolls away / is lost once a background server is killed.
+const CALLBACK_LOG_DIR = path.join(__dirname, "..", "..", "logs");
+const CALLBACK_LOG_PATH = path.join(CALLBACK_LOG_DIR, "callbacks.log");
+mkdirSync(CALLBACK_LOG_DIR, { recursive: true });
+
+const appendCallbackLog = (entry: Record<string, unknown>) => {
+  try {
+    appendFileSync(CALLBACK_LOG_PATH, JSON.stringify(entry) + "\n");
+  } catch {
+    // logging is best-effort only; never let it break the actual callback flow
   }
-  console.log(`on_${action} callback failed:`, error?.message ?? error);
+};
+
+const logCallbackSuccess = (
+  action: string,
+  context: Record<string, unknown>,
+  sent: Record<string, unknown>,
+  received: unknown
+) => {
+  console.log(`on_${action} callback response:`, received);
+  appendCallbackLog({
+    timestamp: new Date().toISOString(),
+    action: `on_${action}`,
+    transactionId: context.transactionId,
+    status: "delivered",
+    sent,
+    received,
+  });
+};
+
+const logCallbackError = (action: string, context: Record<string, unknown>, error: any) => {
+  const message = error?.isAxiosError
+    ? `${error.code ?? "ERROR"} — ${error.message}`
+    : String(error?.message ?? error);
+  console.log(`on_${action} callback failed: ${message}`);
+  appendCallbackLog({
+    timestamp: new Date().toISOString(),
+    action: `on_${action}`,
+    transactionId: context?.transactionId,
+    status: "failed",
+    error: message,
+  });
 };
 
 const buildAckResponse = (context: Record<string, unknown>) => ({
@@ -128,9 +167,9 @@ const performAction = (
       const callbackUrl = getCallbackUrl(context, action);
       console.log(`Triggering on_${action} response to:`, callbackUrl);
       const { data } = await axios.post(callbackUrl, responsePayload);
-      console.log(`on_${action} callback response:`, data);
+      logCallbackSuccess(action, context, responsePayload, data);
     } catch (error: any) {
-      logCallbackError(action, error);
+      logCallbackError(action, context, error);
     }
   })();
 
@@ -150,9 +189,9 @@ const performTrigger = (req: Request, res: Response, action: string) => {
       const callbackUrl = getCallbackUrl(context, action);
       console.log(`Triggering on_${action} response to:`, callbackUrl);
       const { data } = await axios.post(callbackUrl, responsePayload);
-      console.log(`on_${action} callback response:`, data);
+      logCallbackSuccess(action, context, responsePayload, data);
     } catch (error: any) {
-      logCallbackError(action, error);
+      logCallbackError(action, context, error);
     }
   })();
 
@@ -190,9 +229,9 @@ export const onDiscover = (req: Request, res: Response) => {
       const callbackUrl = getCallbackUrl(context, "discover");
       console.log("Triggering on_discover response to:", callbackUrl);
       const { data } = await axios.post(callbackUrl, responsePayload);
-      console.log("on_discover callback response:", data);
+      logCallbackSuccess("discover", context, responsePayload, data);
     } catch (error: any) {
-      logCallbackError("discover", error);
+      logCallbackError("discover", context, error);
     }
   })();
 
@@ -286,9 +325,9 @@ export const onSelect = (req: Request, res: Response) => {
       const callbackUrl = getCallbackUrl(context, "select");
       console.log("Triggering on_select response to:", callbackUrl);
       const { data } = await axios.post(callbackUrl, responsePayload);
-      console.log("on_select callback response:", data);
+      logCallbackSuccess("select", context, responsePayload, data);
     } catch (error: any) {
-      logCallbackError("select", error);
+      logCallbackError("select", context, error);
     }
   })();
 
@@ -424,9 +463,9 @@ const performDynamicAction = (
       const callbackUrl = getCallbackUrl(context, action);
       console.log(`Triggering on_${action} response to:`, callbackUrl);
       const { data } = await axios.post(callbackUrl, responsePayload);
-      console.log(`on_${action} callback response:`, data);
+      logCallbackSuccess(action, context, responsePayload, data);
     } catch (error: any) {
-      logCallbackError(action, error);
+      logCallbackError(action, context, error);
     }
   })();
 
