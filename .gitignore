@@ -119,3 +119,6 @@ Thumbs.db
 *.tmp
 *.temp
 
+# Local working docs — not part of the public repo
+HOW_IT_WORKS.md
+
