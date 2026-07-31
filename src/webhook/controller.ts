@@ -54,7 +54,6 @@ const logCallbackSuccess = (
     received,
   });
 };
-
 const logCallbackError = (action: string, context: Record<string, unknown>, error: any) => {
   const message = error?.isAxiosError
     ? `${error.code ?? "ERROR"} — ${error.message}`
