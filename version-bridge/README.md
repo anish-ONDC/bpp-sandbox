@@ -2,9 +2,6 @@
 
 A registry-driven translation layer for bridging participants on different Beckn protocol versions — e.g. a BPP on v3.0.0 talking to a BAP still on v2.0.0 — without either side changing code.
 
-## Why
-
-Beckn-ONIX's own `SchemaVersionMediator` plugin only translates fields nested inside a tagged (`@context`/`@type`) sub-object. It cannot touch `context`, top-level `message` fields, or renamed properties — the exact kind of change a real protocol version bump involves. `version-bridge` solves that class of problem instead: a registry participants publish their declared version to, translation artifacts (JSONata) for adjacent version pairs, and a bridge that looks up both sides and applies the right transform automatically.
 
 ## Status
 
