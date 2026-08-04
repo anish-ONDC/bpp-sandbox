@@ -60,8 +60,4 @@ npm install
 node run.js
 ```
 
-## Real, grounded facts this project relies on
 
-- `context.version` is hard-locked (`const: 2.0.0`) in the real, current Beckn v2.0.0 spec — there is no native multi-version support today, which is the whole reason this exists.
-- `Contract`, `Resource`, `Performance`, and `OnDiscoverAction` are closed schemas (`additionalProperties: false`) in the real spec — confirmed by reading `beckn2.yaml` directly, not assumed.
-- `Context` itself is **not** closed in the real spec — no `additionalProperties: false` on it at all. Confirmed by testing: a new `context` field passes validation even without any schema change, on any version. Only genuinely closed schemas (`Contract`, `OnDiscoverAction`) need `beckn3.yaml`'s changes to accept new fields.
