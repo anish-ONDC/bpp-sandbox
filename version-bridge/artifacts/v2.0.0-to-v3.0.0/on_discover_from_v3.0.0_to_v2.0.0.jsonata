@@ -1,0 +1,6 @@
+/* Response direction, v3.0.0 -> v2.0.0. Strips context.traceId and
+   message.catalogSummary before a v2.0.0 BAP sees them. */
+{
+  "context": $sift(context, function($v, $k) { $k != "traceId" }),
+  "message": $sift(message, function($v, $k) { $k != "catalogSummary" })
+}

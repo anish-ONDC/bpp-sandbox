@@ -1,0 +1,5 @@
+# Example manifest for a BAP still on the current Beckn v2.0.0 spec.
+subscriberId: "nfh.global/subscribers.beckn.one/example-bap"
+role: BAP
+version: "2.0.0"
+publishedAt: "2026-08-04T00:00:00Z"

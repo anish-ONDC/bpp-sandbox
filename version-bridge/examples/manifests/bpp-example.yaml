@@ -1,0 +1,5 @@
+# Example manifest for a BPP on the newer protocol version.
+subscriberId: "nfh.global/subscribers.beckn.one/seller-side-bpp"
+role: BPP
+version: "3.0.0"
+publishedAt: "2026-08-04T00:00:00Z"

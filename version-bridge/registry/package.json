@@ -1,0 +1,14 @@
+{
+  "name": "version-bridge-registry",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Registry for the multi-version Beckn bridge: participant manifests and translation artifacts.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "js-yaml": "^5.2.3"
+  }
+}

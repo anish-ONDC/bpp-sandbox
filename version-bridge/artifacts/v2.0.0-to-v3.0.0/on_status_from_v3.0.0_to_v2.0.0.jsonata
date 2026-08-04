@@ -1,0 +1,11 @@
+/* Response direction, v3.0.0 -> v2.0.0. Strips context.traceId and renames
+   message.contract.progress back to message.contract.performance. */
+{
+  "context": $sift(context, function($v, $k) { $k != "traceId" }),
+  "message": {
+    "contract": $merge([
+      $sift(message.contract, function($v, $k) { $k != "progress" }),
+      message.contract.progress ? { "performance": message.contract.progress } : {}
+    ])
+  }
+}

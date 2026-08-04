@@ -1,0 +1,10 @@
+{
+  "name": "version-bridge-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reads a payload's declared version, looks up the target's declared version from the registry, and applies the matching translation artifact.",
+  "main": "bridge.js",
+  "dependencies": {
+    "jsonata": "^2.2.2"
+  }
+}
