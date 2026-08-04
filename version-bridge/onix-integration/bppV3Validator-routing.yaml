@@ -1,0 +1,16 @@
+# domain is required here — ONIX's router only treats domain as optional for
+# the literal version string "2.0.0", not for "3.0.0" or any other value.
+routingRules:
+  - domain: "beckn.one.logistics.p2p-delivery"
+    version: "3.0.0"
+    targetType: "url"
+    target:
+      url: "http://localhost:3000/api/bap-webhook"
+      excludeAction: false
+    endpoints:
+      - on_discover
+      - on_select
+      - on_init
+      - on_confirm
+      - on_status
+      - on_cancel

@@ -1,0 +1,45 @@
+# Reference only — this is the module added to the real beckn-onix
+# adapter.yaml for Phase 5, not a standalone runnable file. beckn-onix
+# itself is a separate clone of the public upstream project and is never
+# pushed anywhere; this snippet documents the wiring without touching that
+# repo. Paths shown relative to the beckn-onix config directory.
+#
+# progress and catalogSummary only appear in on_<action> responses, so this
+# is modeled as an outbound module (like bppTxnCaller), not inbound.
+# Existing modules validating pure v2.0.0 are untouched by this addition.
+
+- name: bppV3Validator
+  path: /bpp/v3-caller/
+  handler:
+    type: std
+    role: bpp
+    subscriberId: bpp1
+    httpClientConfig:
+      maxIdleConns: 1000
+      maxIdleConnsPerHost: 200
+      idleConnTimeout: 300s
+      responseHeaderTimeout: 5s
+    plugins:
+      cache:
+        id: cache
+        config:
+          addr: localhost:6379
+      schemaValidator:
+        id: schemav2validator
+        config:
+          type: file
+          location: config/onix-bpp/beckn3.yaml
+          cacheTTL: "3600"
+          extendedSchema_enabled: "false"
+      router:
+        id: router
+        config:
+          routingConfig: config/onix-bpp/bppV3Validator-routing.yaml
+      middleware:
+        - id: reqpreprocessor
+          config:
+            contextKeys: transaction_id,message_id
+            role: bpp
+    steps:
+      - validateSchema
+      - addRoute
