@@ -71,6 +71,4 @@ Getting a real BPP to actually exercise the bridge (rather than just proving the
 - `on_discover`/`on_status` build genuine v3.0.0 content (`catalogSummary`, `traceId`, `progress`) and send it through ONIX's v3.0.0-validating module instead of calling the BAP directly — that's what actually gives the bridge something real to strip back out.
 - `select`/`init`/`confirm`/`cancel` are left calling the BAP directly, unchanged — no translation artifacts exist for those yet, so there's nothing for the bridge to do with them.
 
-## Live cross-machine test
 
-Run end to end against a real other machine, full lifecycle (`discover` → `select` → `init` → `confirm` → `status` → `cancel`), not a local mock. `discover`/`status` genuinely round-tripped through v3.0.0 (verified `catalogSummary`/`traceId`/`progress` present mid-flight in `bridge/logs/bridge.log`, correctly stripped before the other machine received them); the rest passed through as plain v2.0.0. See `docs/live-test-guide.md` for the steps.
