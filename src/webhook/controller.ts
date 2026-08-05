@@ -145,11 +145,10 @@ const buildResponseContext = (
   return result;
 };
 
-// discover/status are the only two actions version-bridge has published
-// translation artifacts for, so those two go out as real v3.0.0 and get
-// downgraded by the bridge; everything else still goes straight to the BAP
-// unchanged, same as before.
-const BRIDGED_ACTIONS = new Set(["discover", "status"]);
+// All six actions now have real translation artifacts in version-bridge, so
+// discover/select/init/confirm/status/cancel all go out as real v3.0.0 and
+// get downgraded by the bridge. update/track/support/rate (performAction/
+// performTrigger below) still call the BAP directly — no artifacts for those.
 const ONIX_V3_CALLER_BASE = "http://localhost:8080/bpp/v3-caller";
 
 const getBridgedCallbackUrl = (action: string): string => `${ONIX_V3_CALLER_BASE}/on_${action}`;
@@ -178,12 +177,10 @@ const toV3Payload = (
     );
   }
 
-  if (action === "status") {
-    const contract = (message as any).contract;
-    if (contract?.performance) {
-      const { performance, ...rest } = contract;
-      message.contract = { ...rest, progress: performance };
-    }
+  const contract = (message as any).contract;
+  if (contract?.performance) {
+    const { performance, ...rest } = contract;
+    message.contract = { ...rest, progress: performance };
   }
 
   return { ...payload, context: v3Context, message };
@@ -367,10 +364,11 @@ export const onSelect = (req: Request, res: Response) => {
         ...template,
         context: buildResponseContext(context, "select"),
       };
-      const callbackUrl = getCallbackUrl(context, "select");
+      const v3Payload = toV3Payload("select", responsePayload);
+      const callbackUrl = getBridgedCallbackUrl("select");
       logForwarding("select", callbackUrl);
-      const { data } = await axios.post(callbackUrl, responsePayload);
-      logCallbackSuccess("select", context, responsePayload, data);
+      const { data } = await axios.post(callbackUrl, v3Payload);
+      logCallbackSuccess("select", context, v3Payload, data);
     } catch (error: any) {
       logCallbackError("select", context, error);
     }
@@ -505,15 +503,11 @@ const performDynamicAction = (
     try {
       const template = await buildMessage(context, message);
       const responsePayload = { ...template, context: buildResponseContext(context, action) };
-      const outboundPayload = BRIDGED_ACTIONS.has(action)
-        ? toV3Payload(action, responsePayload)
-        : responsePayload;
-      const callbackUrl = BRIDGED_ACTIONS.has(action)
-        ? getBridgedCallbackUrl(action)
-        : getCallbackUrl(context, action);
+      const v3Payload = toV3Payload(action, responsePayload);
+      const callbackUrl = getBridgedCallbackUrl(action);
       logForwarding(action, callbackUrl);
-      const { data } = await axios.post(callbackUrl, outboundPayload);
-      logCallbackSuccess(action, context, outboundPayload, data);
+      const { data } = await axios.post(callbackUrl, v3Payload);
+      logCallbackSuccess(action, context, v3Payload, data);
     } catch (error: any) {
       logCallbackError(action, context, error);
     }
