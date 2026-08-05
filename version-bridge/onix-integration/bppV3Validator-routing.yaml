@@ -5,10 +5,8 @@
 # no longer needed here — the bridge looks up the target's endpointUrl from
 # its registry manifest instead of it being hardcoded in this routing rule.
 #
-# Only on_discover/on_status — those are the only two actions with real,
-# tested v3.0.0-to-v2.0.0 response artifacts. on_select/on_init/on_confirm/
-# on_cancel aren't routed here at all; the backend sends those straight to
-# the BAP, same as before this module existed.
+# All six on_<action> callbacks now have real v3.0.0-to-v2.0.0 response
+# artifacts, so they all route through the bridge.
 routingRules:
   - domain: "beckn.one:logistics:p2p-delivery:1.0"
     version: "3.0.0"
@@ -22,7 +20,39 @@ routingRules:
     version: "3.0.0"
     targetType: "url"
     target:
+      url: "http://localhost:9200/translate/on_select?target=nfh.global/subscribers.beckn.one/example-bap"
+      excludeAction: true
+    endpoints:
+      - on_select
+  - domain: "beckn.one:logistics:p2p-delivery:1.0"
+    version: "3.0.0"
+    targetType: "url"
+    target:
+      url: "http://localhost:9200/translate/on_init?target=nfh.global/subscribers.beckn.one/example-bap"
+      excludeAction: true
+    endpoints:
+      - on_init
+  - domain: "beckn.one:logistics:p2p-delivery:1.0"
+    version: "3.0.0"
+    targetType: "url"
+    target:
+      url: "http://localhost:9200/translate/on_confirm?target=nfh.global/subscribers.beckn.one/example-bap"
+      excludeAction: true
+    endpoints:
+      - on_confirm
+  - domain: "beckn.one:logistics:p2p-delivery:1.0"
+    version: "3.0.0"
+    targetType: "url"
+    target:
       url: "http://localhost:9200/translate/on_status?target=nfh.global/subscribers.beckn.one/example-bap"
       excludeAction: true
     endpoints:
       - on_status
+  - domain: "beckn.one:logistics:p2p-delivery:1.0"
+    version: "3.0.0"
+    targetType: "url"
+    target:
+      url: "http://localhost:9200/translate/on_cancel?target=nfh.global/subscribers.beckn.one/example-bap"
+      excludeAction: true
+    endpoints:
+      - on_cancel

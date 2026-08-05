@@ -1,12 +1,8 @@
 # version: "2.0.0" is the one literal value ONIX's router treats domain as
 # optional for, so no domain field needed here (unlike bppV3Validator-routing.yaml).
 #
-# discover/status go through the bridge — those are the only two actions
-# with real, tested v2.0.0-to-v3.0.0 request artifacts right now. select/
-# init/confirm/cancel have no artifacts, so they route straight to the
-# backend, same as bppTxnReciever does — this just keeps the whole lifecycle
-# reachable under one consistent /bpp/v2-receiver/<action> URL for the BAP,
-# instead of splitting the flow across two different base paths.
+# All six actions now have real v2.0.0-to-v3.0.0 request artifacts, so they
+# all route through the bridge instead of some going straight to the backend.
 routingRules:
   - version: "2.0.0"
     targetType: "url"
@@ -18,6 +14,27 @@ routingRules:
   - version: "2.0.0"
     targetType: "url"
     target:
+      url: "http://localhost:9200/translate/select?target=nfh.global/subscribers.beckn.one/seller-side-bpp"
+      excludeAction: true
+    endpoints:
+      - select
+  - version: "2.0.0"
+    targetType: "url"
+    target:
+      url: "http://localhost:9200/translate/init?target=nfh.global/subscribers.beckn.one/seller-side-bpp"
+      excludeAction: true
+    endpoints:
+      - init
+  - version: "2.0.0"
+    targetType: "url"
+    target:
+      url: "http://localhost:9200/translate/confirm?target=nfh.global/subscribers.beckn.one/seller-side-bpp"
+      excludeAction: true
+    endpoints:
+      - confirm
+  - version: "2.0.0"
+    targetType: "url"
+    target:
       url: "http://localhost:9200/translate/status?target=nfh.global/subscribers.beckn.one/seller-side-bpp"
       excludeAction: true
     endpoints:
@@ -25,10 +42,7 @@ routingRules:
   - version: "2.0.0"
     targetType: "url"
     target:
-      url: "http://localhost:3000/api/webhook"
-      excludeAction: false
+      url: "http://localhost:9200/translate/cancel?target=nfh.global/subscribers.beckn.one/seller-side-bpp"
+      excludeAction: true
     endpoints:
-      - select
-      - init
-      - confirm
       - cancel
