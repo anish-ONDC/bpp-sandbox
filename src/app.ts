@@ -3,20 +3,15 @@ import cors from "cors";
 import helmet from "helmet";
 import { webhookRoutes } from "./webhook/routes";
 import { bapWebhookRoutes } from "./bap-webhook/routes";
+import { logIncoming } from "./utils/logger";
 export function createApp() {
   const app = express();
   app.use(cors());
   app.use(helmet());
 
-  // TEMP DEBUG: log every incoming request's content-type before parsing,
-  // then its parsed body after. Remove once the empty-context issue is found.
-  app.use((req, _res, next) => {
-    console.log(`[incoming] ${req.method} ${req.originalUrl} content-type=${req.headers["content-type"]}`);
-    next();
-  });
   app.use(express.json({ limit: "5mb" }));
   app.use((req, _res, next) => {
-    console.log(`[incoming body] ${req.method} ${req.originalUrl}`, JSON.stringify(req.body));
+    logIncoming(req.method, req.originalUrl, req.body);
     next();
   });
 

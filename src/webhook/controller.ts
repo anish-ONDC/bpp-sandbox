@@ -5,6 +5,7 @@ import path from "path";
 import { readNetworkResponse, resolveNetworkId, normalizeContext } from "../utils";
 import { fetchShopifyCatalog, fetchShopifyOfferById, parseShopifyProductId } from "../integrations/shopify";
 import { saveSelection, getSelection } from "../utils/transactionStore";
+import { logForwarding, logDelivered, logFailed, logFallback } from "../utils/logger";
 
 const getPersona = (): string | undefined => {
   return process.env.PERSONA;
@@ -44,7 +45,7 @@ const logCallbackSuccess = (
   sent: Record<string, unknown>,
   received: unknown
 ) => {
-  console.log(`on_${action} callback response:`, received);
+  logDelivered(action, received);
   appendCallbackLog({
     timestamp: new Date().toISOString(),
     action: `on_${action}`,
@@ -58,7 +59,7 @@ const logCallbackError = (action: string, context: Record<string, unknown>, erro
   const message = error?.isAxiosError
     ? `${error.code ?? "ERROR"} — ${error.message}`
     : String(error?.message ?? error);
-  console.log(`on_${action} callback failed: ${message}`);
+  logFailed(action, message);
   appendCallbackLog({
     timestamp: new Date().toISOString(),
     action: `on_${action}`,
@@ -144,6 +145,50 @@ const buildResponseContext = (
   return result;
 };
 
+// discover/status are the only two actions version-bridge has published
+// translation artifacts for, so those two go out as real v3.0.0 and get
+// downgraded by the bridge; everything else still goes straight to the BAP
+// unchanged, same as before.
+const BRIDGED_ACTIONS = new Set(["discover", "status"]);
+const ONIX_V3_CALLER_BASE = "http://localhost:8080/bpp/v3-caller";
+
+const getBridgedCallbackUrl = (action: string): string => `${ONIX_V3_CALLER_BASE}/on_${action}`;
+
+// Reshapes a v2.0.0 response into the v3.0.0 shape defined in
+// version-bridge/beckn3.yaml, so ONIX's bppV3Validator module actually has
+// something real to validate and the bridge has something real to strip
+// back out — not just a version number changed in place.
+const toV3Payload = (
+  action: string,
+  payload: Record<string, unknown>
+): Record<string, unknown> => {
+  const context = payload.context as Record<string, unknown>;
+  const v3Context = {
+    ...context,
+    version: "3.0.0",
+    traceId: `trace-${context.transactionId}`,
+  };
+
+  const message = { ...(payload.message as Record<string, unknown>) };
+
+  if (action === "discover" && Array.isArray((message as any).catalogs)) {
+    message.catalogSummary = (message as any).catalogs.map(
+      (catalog: any) =>
+        `${catalog?.descriptor?.name ?? catalog?.id}: ${catalog?.resources?.length ?? 0} resources, ${catalog?.offers?.length ?? 0} offers`
+    );
+  }
+
+  if (action === "status") {
+    const contract = (message as any).contract;
+    if (contract?.performance) {
+      const { performance, ...rest } = contract;
+      message.contract = { ...rest, progress: performance };
+    }
+  }
+
+  return { ...payload, context: v3Context, message };
+};
+
 const performAction = (
   req: Request,
   res: Response,
@@ -164,7 +209,7 @@ const performAction = (
         context: buildResponseContext(context, action),
       };
       const callbackUrl = getCallbackUrl(context, action);
-      console.log(`Triggering on_${action} response to:`, callbackUrl);
+      logForwarding(action, callbackUrl);
       const { data } = await axios.post(callbackUrl, responsePayload);
       logCallbackSuccess(action, context, responsePayload, data);
     } catch (error: any) {
@@ -186,7 +231,7 @@ const performTrigger = (req: Request, res: Response, action: string) => {
     try {
       const responsePayload = { message, context: buildResponseContext(context, action) };
       const callbackUrl = getCallbackUrl(context, action);
-      console.log(`Triggering on_${action} response to:`, callbackUrl);
+      logForwarding(action, callbackUrl);
       const { data } = await axios.post(callbackUrl, responsePayload);
       logCallbackSuccess(action, context, responsePayload, data);
     } catch (error: any) {
@@ -205,7 +250,7 @@ const buildDiscoverMessage = async (
       const catalog = await fetchShopifyCatalog();
       return { message: { catalogs: [catalog] } };
     } catch (error: any) {
-      console.log("Shopify catalog fetch failed, falling back to static template:", error?.message ?? error);
+      logFallback(`Shopify catalog fetch failed, falling back to static template: ${error?.message ?? error}`);
     }
   }
   return readNetworkResponse(resolveNetworkId(context), "on_discover", getPersona());
@@ -225,10 +270,11 @@ export const onDiscover = (req: Request, res: Response) => {
         ...template,
         context: buildResponseContext(context, "discover"),
       };
-      const callbackUrl = getCallbackUrl(context, "discover");
-      console.log("Triggering on_discover response to:", callbackUrl);
-      const { data } = await axios.post(callbackUrl, responsePayload);
-      logCallbackSuccess("discover", context, responsePayload, data);
+      const v3Payload = toV3Payload("discover", responsePayload);
+      const callbackUrl = getBridgedCallbackUrl("discover");
+      logForwarding("discover", callbackUrl);
+      const { data } = await axios.post(callbackUrl, v3Payload);
+      logCallbackSuccess("discover", context, v3Payload, data);
     } catch (error: any) {
       logCallbackError("discover", context, error);
     }
@@ -300,7 +346,7 @@ const buildSelectMessage = async (
         };
       }
     } catch (error: any) {
-      console.log("Shopify product lookup failed for select, falling back to static template:", error?.message ?? error);
+      logFallback(`Shopify product lookup failed for select, falling back to static template: ${error?.message ?? error}`);
     }
   }
 
@@ -322,7 +368,7 @@ export const onSelect = (req: Request, res: Response) => {
         context: buildResponseContext(context, "select"),
       };
       const callbackUrl = getCallbackUrl(context, "select");
-      console.log("Triggering on_select response to:", callbackUrl);
+      logForwarding("select", callbackUrl);
       const { data } = await axios.post(callbackUrl, responsePayload);
       logCallbackSuccess("select", context, responsePayload, data);
     } catch (error: any) {
@@ -459,10 +505,15 @@ const performDynamicAction = (
     try {
       const template = await buildMessage(context, message);
       const responsePayload = { ...template, context: buildResponseContext(context, action) };
-      const callbackUrl = getCallbackUrl(context, action);
-      console.log(`Triggering on_${action} response to:`, callbackUrl);
-      const { data } = await axios.post(callbackUrl, responsePayload);
-      logCallbackSuccess(action, context, responsePayload, data);
+      const outboundPayload = BRIDGED_ACTIONS.has(action)
+        ? toV3Payload(action, responsePayload)
+        : responsePayload;
+      const callbackUrl = BRIDGED_ACTIONS.has(action)
+        ? getBridgedCallbackUrl(action)
+        : getCallbackUrl(context, action);
+      logForwarding(action, callbackUrl);
+      const { data } = await axios.post(callbackUrl, outboundPayload);
+      logCallbackSuccess(action, context, outboundPayload, data);
     } catch (error: any) {
       logCallbackError(action, context, error);
     }
@@ -491,7 +542,7 @@ const buildInitMessage = async (
       return dynamic;
     }
   } catch (error: any) {
-    console.log("Dynamic init failed, falling back to static template:", error?.message ?? error);
+    logFallback(`Dynamic init failed, falling back to static template: ${error?.message ?? error}`);
   }
   return readNetworkResponse(resolveNetworkId(context), "on_init", getPersona());
 };
@@ -517,7 +568,7 @@ const buildConfirmMessage = async (
       return dynamic;
     }
   } catch (error: any) {
-    console.log("Dynamic confirm failed, falling back to static template:", error?.message ?? error);
+    logFallback(`Dynamic confirm failed, falling back to static template: ${error?.message ?? error}`);
   }
   return readNetworkResponse(resolveNetworkId(context), "on_confirm", getPersona());
 };
@@ -536,7 +587,7 @@ const buildStatusMessage = async (context: Record<string, unknown>): Promise<Rec
       return dynamic;
     }
   } catch (error: any) {
-    console.log("Dynamic status failed, falling back to static template:", error?.message ?? error);
+    logFallback(`Dynamic status failed, falling back to static template: ${error?.message ?? error}`);
   }
   return readNetworkResponse(resolveNetworkId(context), "on_status", getPersona());
 };
@@ -554,7 +605,7 @@ const buildCancelMessage = async (context: Record<string, unknown>): Promise<Rec
       return dynamic;
     }
   } catch (error: any) {
-    console.log("Dynamic cancel failed, falling back to static template:", error?.message ?? error);
+    logFallback(`Dynamic cancel failed, falling back to static template: ${error?.message ?? error}`);
   }
   return readNetworkResponse(resolveNetworkId(context), "on_cancel", getPersona());
 };
