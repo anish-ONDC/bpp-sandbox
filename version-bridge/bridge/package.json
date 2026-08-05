@@ -5,6 +5,7 @@
   "description": "Reads a payload's declared version, looks up the target's declared version from the registry, and applies the matching translation artifact.",
   "main": "bridge.js",
   "dependencies": {
+    "express": "^5.1.0",
     "jsonata": "^2.2.2"
   }
 }

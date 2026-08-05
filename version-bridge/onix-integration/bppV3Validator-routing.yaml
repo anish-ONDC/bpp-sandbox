@@ -1,16 +1,28 @@
-# domain is required here — ONIX's router only treats domain as optional for
-# the literal version string "2.0.0", not for "3.0.0" or any other value.
+# excludeAction: true + explicit full URLs, not auto-append — the target URL
+# has its own query string (target= for the bridge server), and ONIX's
+# auto-append is a plain string concat that would land the action name after
+# the query string instead of before it. Confirmed by testing. forward= is
+# no longer needed here — the bridge looks up the target's endpointUrl from
+# its registry manifest instead of it being hardcoded in this routing rule.
+#
+# Only on_discover/on_status — those are the only two actions with real,
+# tested v3.0.0-to-v2.0.0 response artifacts. on_select/on_init/on_confirm/
+# on_cancel aren't routed here at all; the backend sends those straight to
+# the BAP, same as before this module existed.
 routingRules:
-  - domain: "beckn.one.logistics.p2p-delivery"
+  - domain: "beckn.one:logistics:p2p-delivery:1.0"
     version: "3.0.0"
     targetType: "url"
     target:
-      url: "http://localhost:3000/api/bap-webhook"
-      excludeAction: false
+      url: "http://localhost:9200/translate/on_discover?target=nfh.global/subscribers.beckn.one/example-bap"
+      excludeAction: true
     endpoints:
       - on_discover
-      - on_select
-      - on_init
-      - on_confirm
+  - domain: "beckn.one:logistics:p2p-delivery:1.0"
+    version: "3.0.0"
+    targetType: "url"
+    target:
+      url: "http://localhost:9200/translate/on_status?target=nfh.global/subscribers.beckn.one/example-bap"
+      excludeAction: true
+    endpoints:
       - on_status
-      - on_cancel

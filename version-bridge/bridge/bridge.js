@@ -1,5 +1,7 @@
 // Translates a payload from its own declared version to a target
-// participant's declared version, using a single direct hop.
+// participant's declared version, using a single direct hop. Returns the
+// target's endpointUrl alongside the translated payload, so a caller doesn't
+// have to hardcode where the result should be sent.
 
 const jsonata = require("jsonata");
 
@@ -36,9 +38,10 @@ async function bridge({ payload, action, targetSubscriberId, registryUrl }) {
 
   const lookup = await fetchJSON(`${registryUrl}/lookup/${namespace}/${registry}/${recordName}`);
   const targetVersion = lookup.data.version;
+  const targetEndpointUrl = lookup.data.endpointUrl;
 
   if (sourceVersion === targetVersion) {
-    return payload;
+    return { payload, targetEndpointUrl };
   }
 
   // Folder/file names carry a "v" prefix; version fields in the payload don't.
@@ -65,7 +68,7 @@ async function bridge({ payload, action, targetSubscriberId, registryUrl }) {
   // Artifacts don't set version themselves — stamp it here after transform.
   result.context = { ...result.context, version: targetVersion };
 
-  return result;
+  return { payload: result, targetEndpointUrl };
 }
 
 module.exports = { bridge, BridgeError };

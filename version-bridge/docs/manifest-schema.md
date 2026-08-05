@@ -15,6 +15,7 @@ subscriberId: string      # required, exactly 3 slash-separated parts: namespace
 role: string               # required, one of: BAP, BPP
 version: string             # required, the Beckn protocol version this participant currently speaks (e.g. "2.0.0")
 publishedAt: string          # required, ISO 8601 timestamp of when this declaration was published
+endpointUrl: string           # optional, base URL the bridge forwards translated payloads to (action name is appended)
 ```
 
 ## Field notes
@@ -23,8 +24,9 @@ publishedAt: string          # required, ISO 8601 timestamp of when this declara
 - **`role`** — determines which direction a request naturally flows in when this participant is involved (matches the real Beckn distinction between the two actor types, not an invented category).
 - **`version`** — a single string. Deliberately **not** a list — a real participant speaks one protocol version at a time, unlike a domain-pack extension (a different, narrower concept explored and abandoned earlier in this project) where a participant might support a range of sub-schema versions simultaneously. One participant, one declared protocol version, at any given moment.
 - **`publishedAt`** — lets the registry (or an operator) determine how stale a declaration is. Not used for correctness in Phase 1, but present from the start so later phases don't need a schema migration to add it.
+- **`endpointUrl`** — added once the bridge actually needed somewhere to forward a translated payload to. At Phase 1 this manifest had nothing yet to route through, so an endpoint URL was rightly out of scope; once ONIX started calling the bridge instead of the participant directly, hardcoding every destination in ONIX's own routing config stopped scaling past one fixed pairing. Optional, not required — a manifest without it still validates, it just means the bridge can't auto-route for that participant and needs an explicit `forward` override instead.
 
 ## What this schema deliberately excludes
 
-- No field describing the participant's actual endpoint URL, signing keys, or network membership — those are real DeDi registry concerns, already handled by other parts of a real Beckn deployment, and out of scope for what this manifest needs to declare.
+- No field for signing keys or network membership — real DeDi registry concerns, already handled by other parts of a real Beckn deployment, and out of scope for what this manifest needs to declare.
 - No per-action or per-object versioning — that is what the (different, already-explored, and structurally limited) `SchemaVersionMediator` mechanism does. This manifest is intentionally simpler: one version, for the whole protocol, per participant.
