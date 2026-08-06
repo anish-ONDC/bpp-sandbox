@@ -20,3 +20,13 @@ Needs `SHOPIFY_SHOP` and `SHOPIFY_ADMIN_API_TOKEN` in `.env` (see `.env.example`
 `schemas/` holds the real spec files — `beckn2.yaml` (today's rules) and `beckn3.yaml` (the same rules, plus `catalogSummary`). Kept as complete files so a schema's internal dependencies still resolve correctly.
 
 `check-schema.js` loads one of these files and checks a piece of data against one named rule inside it, e.g. `OnDiscoverAction`. `OnDiscoverAction` rejects any field it doesn't know about in the real v2.0.0 file, so data carrying `catalogSummary` fails against `beckn2.yaml` and passes against `beckn3.yaml`. Later phases use this to check the Mapper's output against the rules it's supposed to follow.
+
+## The Mapper
+
+`mapper/v1.js` turns the seller's own product data into the shape a v2.0.0 `on_discover` response needs. No network calls inside it — data in, data out, nothing else. Everything it produces has to actually pass the real rules in `beckn2.yaml`, checked, not assumed.
+
+```bash
+node run-mapper-v1.js
+```
+
+Runs the mapper against the real, already-fetched product data, then checks the result against the real `OnDiscoverAction` rule. Also confirms the seller's own saved data file is byte-for-byte unchanged before and after — the whole point of pulling the Mapper out on its own.
