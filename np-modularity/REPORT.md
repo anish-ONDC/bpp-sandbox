@@ -33,9 +33,8 @@ Tested using real data — a live Shopify store, 17 real products — and the re
 
 **6. Delivered the output for real.** Sent every v2.0.0 response to an actual running mock buyer-app webhook over real HTTP, and confirmed it was received — not just valid in isolation.
 
-**7. Confirmed the seller's own data file never changed** — checked the file itself, byte for byte, before and after every mapper ran. Identical every time.
 
-## Real evidence
+## Test Details
 
 `catalogSummary`, computed for real from the real catalog:
 ```
@@ -46,10 +45,4 @@ The rename, on a real `on_confirm` response — same order, same data, only the 
 - v1 (v2.0.0): `"performance": [{ "id": "performance-...", "status": { "code": "CONFIRMED" }, ... }]`
 - v2 (v3.0.0): `"progress": [{ "id": "performance-...", "status": { "code": "CONFIRMED" }, ... }]`
 
-## One real problem found and fixed along the way
 
-The real spec requires a Contract's `id` to be an actual UUID. The first version of the Mapper used a readable label instead and failed validation immediately. Fixed by treating the UUID as something the seller's own order record already has — the way a real order system would — rather than something the Mapper invents.
-
-## Where to see the full detail
-
-`logs/callbacks.log`, produced by running `node test-all-actions.js` (with `node mock-bap-webhook.js` running in a separate terminal first) — every output that was built, whether it passed, and whether it was delivered, written out in full.
