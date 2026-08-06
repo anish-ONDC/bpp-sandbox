@@ -2,8 +2,6 @@
 
 A small, standalone check on a different question than `version-bridge` answers. That project asked: can two different NPs, on two different protocol versions, still talk to each other. This one asks: inside a single NP, if the Mapper changes or the Protocol shape changes, does the NP's own business code have to change too — or does the Mapper actually absorb it.
 
-Kept as its own project on purpose. Proving something is separable by building it bolted onto the thing it's supposed to be separate from would defeat the point.
-
 ## Status
 
 | Phase | What | Status |
@@ -17,9 +15,8 @@ Kept as its own project on purpose. Proving something is separable by building i
 
 ## Phase 1 — the seller's real data
 
-`fetch-shopify-data.js` pulls every product from the real Shopify store, exactly as Shopify returns it — no shaping, no filtering, nothing Beckn about it. Saved to `data/shopify-raw-products.json`.
+`fetch-shopify-data.js` pulls every product from the real Shopify store, exactly as Shopify returns it. Saved to `data/shopify-raw-products.json`.
 
-This is deliberately the full response, not the trimmed-down version `bpp-sandbox-v2`'s own integration uses today. Worth seeing the whole thing once, since later phases need to know what's actually available to map from — fields like `tags`, `handle`, and `admin_graphql_api_id` exist in the real data and aren't used anywhere yet.
 
 ```bash
 npm install
