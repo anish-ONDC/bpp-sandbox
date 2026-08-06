@@ -17,6 +17,6 @@ Needs `SHOPIFY_SHOP` and `SHOPIFY_ADMIN_API_TOKEN` in `.env` (see `.env.example`
 
 ## Checking data against the real rules
 
-`schemas/` holds full, untouched copies of the real spec files — `beckn2.yaml` (today's real rules) and `beckn3.yaml` (the same rules, with one addition: `catalogSummary`). Nothing trimmed out, nothing hand-copied — the whole file, so anything one schema depends on inside the same file still resolves correctly.
+`schemas/` holds the real spec files — `beckn2.yaml` (today's rules) and `beckn3.yaml` (the same rules, plus `catalogSummary`). Kept as complete files so a schema's internal dependencies still resolve correctly.
 
-`check-schema.js` loads one of these files and checks a piece of data against one named rule inside it, e.g. `OnDiscoverAction`. `OnDiscoverAction` in the real v2.0.0 file rejects any field it doesn't know about, so data carrying `catalogSummary` genuinely fails against `beckn2.yaml` and genuinely passes against `beckn3.yaml` — checked directly against real data, not assumed. This is what the later phases use to prove the Mapper's output actually matches the rules it's supposed to.
+`check-schema.js` loads one of these files and checks a piece of data against one named rule inside it, e.g. `OnDiscoverAction`. `OnDiscoverAction` rejects any field it doesn't know about in the real v2.0.0 file, so data carrying `catalogSummary` fails against `beckn2.yaml` and passes against `beckn3.yaml`. Later phases use this to check the Mapper's output against the rules it's supposed to follow.
