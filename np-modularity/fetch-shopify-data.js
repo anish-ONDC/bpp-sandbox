@@ -1,6 +1,5 @@
 // Phase 1: pull the seller's real data, exactly as Shopify hands it over,
-// and save it untouched. This is "BAP impl" for the rest of this project —
-// nothing here is Beckn-shaped, nothing here is invented.
+// and save it untouched.
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
