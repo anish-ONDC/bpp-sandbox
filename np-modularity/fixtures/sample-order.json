@@ -1,0 +1,11 @@
+{
+  "transactionId": "order-sample-9f1c2a",
+  "contractId": "040ee6b2-4ade-4e3f-86c0-5ba4f328363e",
+  "productId": "8735376474306",
+  "quantity": 1,
+  "buyer": {
+    "name": "Test Buyer",
+    "phone": "+91 90000 00000"
+  },
+  "paymentMethod": "UPI"
+}

@@ -23,11 +23,24 @@ Needs `SHOPIFY_SHOP` and `SHOPIFY_ADMIN_API_TOKEN` in `.env` (see `.env.example`
 
 ## The Mapper
 
-`mapper/v1.js` turns the seller's own product data into the shape a v2.0.0 `on_discover` response needs. `mapper/v2.js` does the same thing for v3.0.0, adding `catalogSummary`. Both share the same per-product conversion (`mapper/shared.js`) — that part hasn't changed between versions, only the top-level wrapping has. No network calls in either mapper — data in, data out, nothing else.
+`mapper/v1.js` turns the seller's own data into the v2.0.0 shape for every response — `discover`, `select`, `init`, `confirm`, `status`, `cancel`. `mapper/v2.js` does the same for v3.0.0: `catalogSummary` on discover only, and `progress` instead of `performance` wherever a contract actually carries fulfillment data. Both share the same building blocks (`mapper/shared.js` for products, `mapper/contract-shared.js` for orders) — those haven't changed between versions, only the parts that actually differ have. No network calls in either mapper.
+
+`fixtures/sample-order.json` is the seller's own record of one order — their own shape, not Beckn's, used for select/init/confirm/status/cancel the same way the real product data is used for discover.
 
 ```bash
 node run-mapper-v1.js
 node run-mapper-v2.js
 ```
 
-Each runs its mapper against the same real, already-fetched product data, then checks the result against its matching rule — v1 against `beckn2.yaml`, v2 against `beckn3.yaml`. Both pass. v2's output was also checked against the *old* v2.0.0 rule directly, and correctly fails, since `catalogSummary` isn't something that rule allows. Same product data file, byte-for-byte unchanged, the whole way through both runs.
+Each checks its output against the matching real rule for discover.
+
+## Full test, every action, both versions
+
+```bash
+node mock-bap-webhook.js   # separate terminal
+node test-all-actions.js
+```
+
+Runs both mapper versions for all six actions, checks each output against its real matching rule, and actually delivers the v2.0.0 output to a mock BAP webhook to confirm it's genuinely receivable, not just schema-valid in isolation. Everything — what was built, whether it validated, whether it was delivered — gets written to `logs/callbacks.log`, so it can be reviewed afterward instead of only scrolling past in a terminal.
+
+One real bug this caught: `Contract.id` requires a UUID in the real spec. The first version used a human-readable ID and failed validation immediately — fixed by having the seller's own order record carry a real UUID for its contract, the way an actual order system would once a contract exists, rather than the Mapper inventing one.

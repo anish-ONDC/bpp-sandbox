@@ -1,9 +1,20 @@
-// Same as v1, targeting v3.0.0 instead — the only real difference is
-// catalogSummary, computed from the same catalogs this function already
-// built. Still no network calls, still pure: data in, data out.
+// Same as v1, targeting v3.0.0 instead. catalogSummary only applies to
+// discover — nothing else returns a catalog. The progress rename applies
+// wherever a contract actually carries performance data, whichever action
+// that happens to be. Still no network calls, still pure.
 const { mapProductToResourceAndOffer } = require("./shared");
+const { buildContract } = require("./contract-shared");
+const v1 = require("./v1");
 
-function mapCatalog(products, { shop, currency }) {
+function renameProgress(contract) {
+  if (!contract.performance) {
+    return contract;
+  }
+  const { performance, ...rest } = contract;
+  return { ...rest, progress: performance };
+}
+
+function mapDiscover(products, { shop, currency }) {
   const mapped = products.map((product) => mapProductToResourceAndOffer(product, currency));
 
   const catalogs = [
@@ -28,4 +39,37 @@ function mapCatalog(products, { shop, currency }) {
   return { catalogs, catalogSummary };
 }
 
-module.exports = { mapCatalog };
+function mapSelect(order, products, currency) {
+  const { contract } = v1.mapSelect(order, products, currency);
+  return { contract: renameProgress(contract) };
+}
+
+function mapInit(order, products, currency) {
+  const { contract } = v1.mapInit(order, products, currency);
+  return { contract: renameProgress(contract) };
+}
+
+function mapConfirm(order, products, currency) {
+  const { contract } = v1.mapConfirm(order, products, currency);
+  return { contract: renameProgress(contract) };
+}
+
+function mapStatus(order, products, currency) {
+  const { contract } = v1.mapStatus(order, products, currency);
+  return { contract: renameProgress(contract) };
+}
+
+function mapCancel(order, products, currency) {
+  const { contract } = v1.mapCancel(order, products, currency);
+  return { contract: renameProgress(contract) };
+}
+
+module.exports = {
+  mapCatalog: mapDiscover,
+  mapDiscover,
+  mapSelect,
+  mapInit,
+  mapConfirm,
+  mapStatus,
+  mapCancel,
+};
