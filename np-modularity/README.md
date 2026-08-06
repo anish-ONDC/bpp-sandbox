@@ -23,10 +23,11 @@ Needs `SHOPIFY_SHOP` and `SHOPIFY_ADMIN_API_TOKEN` in `.env` (see `.env.example`
 
 ## The Mapper
 
-`mapper/v1.js` turns the seller's own product data into the shape a v2.0.0 `on_discover` response needs. No network calls inside it — data in, data out, nothing else. Everything it produces has to actually pass the real rules in `beckn2.yaml`, checked, not assumed.
+`mapper/v1.js` turns the seller's own product data into the shape a v2.0.0 `on_discover` response needs. `mapper/v2.js` does the same thing for v3.0.0, adding `catalogSummary`. Both share the same per-product conversion (`mapper/shared.js`) — that part hasn't changed between versions, only the top-level wrapping has. No network calls in either mapper — data in, data out, nothing else.
 
 ```bash
 node run-mapper-v1.js
+node run-mapper-v2.js
 ```
 
-Runs the mapper against the real, already-fetched product data, then checks the result against the real `OnDiscoverAction` rule. Also confirms the seller's own saved data file is byte-for-byte unchanged before and after — the whole point of pulling the Mapper out on its own.
+Each runs its mapper against the same real, already-fetched product data, then checks the result against its matching rule — v1 against `beckn2.yaml`, v2 against `beckn3.yaml`. Both pass. v2's output was also checked against the *old* v2.0.0 rule directly, and correctly fails, since `catalogSummary` isn't something that rule allows. Same product data file, byte-for-byte unchanged, the whole way through both runs.
