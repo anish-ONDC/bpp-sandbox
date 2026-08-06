@@ -1,5 +1,5 @@
-// Phase 1: pull the seller's real data, exactly as Shopify hands it over,
-// and save it untouched.
+// Pulls the seller's real data, exactly as Shopify hands it over, and
+// saves it untouched.
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
