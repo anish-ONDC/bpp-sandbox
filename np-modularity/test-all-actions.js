@@ -10,20 +10,13 @@ const axios = require("axios");
 const mapperV1 = require("./mapper/v1");
 const mapperV2 = require("./mapper/v2");
 const { check } = require("./check-schema");
+const log = require("./logger");
 
 const PRODUCTS_PATH = path.join(__dirname, "data", "shopify-raw-products.json");
 const ORDER_PATH = path.join(__dirname, "fixtures", "sample-order.json");
 const BECKN2_PATH = path.join(__dirname, "schemas/beckn2.yaml");
 const BECKN3_PATH = path.join(__dirname, "schemas/beckn3.yaml");
 const WEBHOOK_URL = "http://localhost:4010";
-
-const LOG_DIR = path.join(__dirname, "logs");
-const LOG_PATH = path.join(LOG_DIR, "callbacks.log");
-fs.mkdirSync(LOG_DIR, { recursive: true });
-
-function logEntry(entry) {
-  fs.appendFileSync(LOG_PATH, JSON.stringify({ timestamp: new Date().toISOString(), ...entry }) + "\n");
-}
 
 // action -> [v2.0.0 schema name, v3.0.0 schema name, v1 mapper fn, v2 mapper fn]
 const ACTIONS = {
@@ -61,20 +54,22 @@ async function runAction(action, [v2SchemaName, v3SchemaName, v1Fn, v2Fn], produ
   result(`v1 output matches real v2.0.0 rules (${v2SchemaName})`, v1Check.valid);
   result(`v2 output matches real v3.0.0 rules (${v3SchemaName})`, v2Check.valid);
 
-  logEntry({ action, version: "v1 (v2.0.0)", output: v1Output, validAgainstRealSchema: v1Check.valid });
-  logEntry({ action, version: "v2 (v3.0.0)", output: v2Output, validAgainstRealSchema: v2Check.valid });
+  log.logMapped(action, "v1 (v2.0.0)", v1Check.valid, v1Output);
+  log.logMapped(action, "v2 (v3.0.0)", v2Check.valid, v2Output);
 
   try {
     const { data, status } = await axios.post(`${WEBHOOK_URL}/on_${action}`, v1Output);
     result(`v1 output actually delivered to the mock BAP webhook`, status === 200);
-    logEntry({ action, delivered: true, webhookResponse: data });
+    log.logDelivered(action, status, data);
   } catch (err) {
     result(`v1 output actually delivered to the mock BAP webhook`, false);
-    logEntry({ action, delivered: false, error: err.message });
+    log.logFailed(action, err.message);
   }
 }
 
 async function main() {
+  log.reset();
+
   const products = JSON.parse(fs.readFileSync(PRODUCTS_PATH, "utf-8"));
   const order = JSON.parse(fs.readFileSync(ORDER_PATH, "utf-8"));
   const shop = process.env.SHOPIFY_SHOP;
@@ -85,7 +80,7 @@ async function main() {
   }
 
   console.log(`\n${allOk ? "ALL CHECKS PASSED" : "SOME CHECKS FAILED"}`);
-  console.log(`Full log: ${LOG_PATH}`);
+  console.log(`Full log: ${log.LOG_PATH}`);
   process.exit(allOk ? 0 : 1);
 }
 

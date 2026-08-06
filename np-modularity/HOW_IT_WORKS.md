@@ -392,11 +392,12 @@ const WEBHOOK_URL = "http://localhost:4010";
 
 **Block 2 — a log file, so nothing is lost after the terminal closes**
 ```js
-function logEntry(entry) {
-  fs.appendFileSync(LOG_PATH, JSON.stringify({ timestamp: new Date().toISOString(), ...entry }) + "\n");
-}
+const log = require("./logger");
+...
+log.logMapped(action, "v1 (v2.0.0)", v1Check.valid, v1Output);
+log.logDelivered(action, status, data);
 ```
-Every single thing checked — what was built, whether it passed, whether it was delivered — gets written as one line to `logs/callbacks.log`. This means the whole run can be reviewed afterward, not just watched scroll past.
+Every single thing checked — what was built, whether it passed, whether it was delivered — gets written to `logs/callbacks.log` through `logger.js` (below). This means the whole run can be reviewed afterward, not just watched scroll past.
 
 **Block 3 — what to test, for each action**
 ```js
@@ -455,9 +456,32 @@ node test-all-actions.js     # in another terminal
 
 ---
 
+### `logger.js` — writing the log clearly, not as a dense wall of JSON
+
+**Block 1 — one block per event**
+```js
+function writeBlock(header, body) {
+  const lines = [RULE, `[${new Date().toISOString()}] ${header}`, RULE];
+  if (body !== undefined) {
+    lines.push(JSON.stringify(body, null, 2));
+  }
+  lines.push("");
+  fs.appendFileSync(LOG_PATH, lines.join("\n") + "\n");
+}
+```
+Every event gets a clear header line (what happened, when), a line of dashes above and below it, and the actual data underneath — spaced out and indented, not squeezed onto one line. Easy to scroll through and find the one entry that matters.
+
+**Block 2 — one function per kind of event**
+```js
+logMapped(action, version, valid, output) { ... }   // a mapper built something
+logDelivered(action, status, response) { ... }        // it reached the mock webhook
+logFailed(action, error) { ... }                       // it didn't
+```
+`test-all-actions.js` calls these instead of writing to the log file directly — keeps the actual test logic free of formatting details.
+
 ### `logs/callbacks.log`
 
-Not committed to GitHub (regenerated every run). One JSON entry per line — every output that was built, whether it passed its check, and whether it was delivered. This is the file to open to actually see what a v1 vs v2 response looks like for any specific action, side by side.
+Not committed to GitHub (regenerated every run, cleared at the start of each one). Made up of readable blocks, one per event — every output that was built, whether it passed its check, and whether it was delivered. This is the file to open to actually see what a v1 vs v2 response looks like for any specific action, side by side.
 
 ---
 
